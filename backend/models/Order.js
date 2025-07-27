@@ -1,76 +1,50 @@
 import mongoose from 'mongoose';
 
-const confirmationSchema = new mongoose.Schema({
+const articleCommandeSchema = new mongoose.Schema({
+  articleId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Article',
+    required: true
+  },
+  numeroArticle: {
+    type: String,
+    required: true
+  },
+  designation: {
+    type: String,
+    required: true
+  },
   quantite: {
+    type: Number,
+    required: true,
+    min: 1
+  },
+  prixUnitaire: {
     type: Number,
     required: true,
     min: 0
   },
-  date: {
-    type: Date,
+  unite: {
+    type: String,
     required: true
   }
 }, { _id: false });
 
 const orderSchema = new mongoose.Schema({
-  technologie: {
+  numeroCommande: {
     type: String,
     required: true,
-    trim: true
+    unique: true
   },
-  familleProduit: {
-    type: String,
-    required: true,
-    enum: [
-      'APS BulkNiv2',
-      'APS Finished Product',
-      'APS Laser Box',
-      'APS Packaging Label',
-      'APS Copier Box',
-      'APS Cartridge Label',
-      'APS Airbag/Insert/Inlay',
-      'APS Packaging Other'
-    ]
+  clientId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Client',
+    required: true
   },
-  groupeCouverture: {
-    type: String,
-    required: true,
-    enum: ['PF', 'OF'],
-    default: 'PF'
-  },
-  quantiteCommandee: {
-    type: Number,
-    required: true,
-    min: 1
-  },
-  quantiteExpediee: {
-    type: Number,
-    default: 0,
-    min: 0
-  },
-  quantiteALivrer: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  quantiteEnPreparation: {
-    type: Number,
-    default: 0,
-    min: 0
-  },
-  clientLivreId: {
-    type: mongoose.Schema.Types.Mixed,
-    required: true,
-  },
-  clientLivreFinal: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  dateCreation: {
+  articles: [articleCommandeSchema],
+  dateLivraison: {
     type: Date,
-    required: true,
-    default: Date.now
+    required: true
   },
   typeCommande: {
     type: String,
@@ -78,16 +52,34 @@ const orderSchema = new mongoose.Schema({
     enum: ['ZIG', 'STD'],
     default: 'ZIG'
   },
-  dateLivraison: {
-    type: Date,
-    required: true
-  },
-  confirmations: [confirmationSchema],
-  unite: {
+  statut: {
     type: String,
     required: true,
-    enum: ['PCE', 'KG', 'L', 'M'],
-    default: 'PCE'
+    enum: ['brouillon', 'confirmee', 'en_preparation', 'expediee', 'livree'],
+    default: 'brouillon'
+  },
+  dateConfirmation: {
+    type: Date
+  },
+  montantHT: {
+    type: Number,
+    default: 0
+  },
+  tauxTVA: {
+    type: Number,
+    default: 20
+  },
+  montantTVA: {
+    type: Number,
+    default: 0
+  },
+  montantTTC: {
+    type: Number,
+    default: 0
+  },
+  notes: {
+    type: String,
+    trim: true
   }
 }, {
   timestamps: true,
@@ -95,42 +87,48 @@ const orderSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Virtual pour calculer la quantité totale confirmée
-orderSchema.virtual('quantiteTotaleConfirmee').get(function() {
-  return this.confirmations.reduce((total, conf) => total + conf.quantite, 0);
+// Virtual pour vérifier si la commande est confirmée
+orderSchema.virtual('estConfirmee').get(function() {
+  return this.statut !== 'brouillon';
 });
 
-// Virtual pour vérifier si la commande est entièrement confirmée
-orderSchema.virtual('estEntierementConfirmee').get(function() {
-  return this.quantiteTotaleConfirmee >= this.quantiteCommandee;
-});
-
-// Virtual pour obtenir la dernière date de confirmation
-orderSchema.virtual('derniereDateConfirmation').get(function() {
-  if (this.confirmations.length === 0) return null;
-  return this.confirmations
-    .sort((a, b) => new Date(b.date) - new Date(a.date))[0].date;
-});
-
-// Index pour améliorer les performances de recherche
-orderSchema.index({ clientLivreFinal: 1 });
-orderSchema.index({ technologie: 1 });
-orderSchema.index({ dateCreation: -1 });
-orderSchema.index({ dateLivraison: 1 });
-orderSchema.index({ 'confirmations.date': -1 });
-
-// Méthode pour ajouter une confirmation
-orderSchema.methods.ajouterConfirmation = function(quantite, date = new Date()) {
-  const quantiteRestante = this.quantiteCommandee - this.quantiteTotaleConfirmee;
-  
-  if (quantite > quantiteRestante) {
-    throw new Error(`Quantité trop élevée. Maximum: ${quantiteRestante}`);
-  }
-  
-  this.confirmations.push({ quantite, date });
-  this.quantiteALivrer = this.quantiteCommandee - this.quantiteTotaleConfirmee;
-  
-  return this.save();
+// Méthode pour générer un numéro de commande
+orderSchema.statics.genererNumeroCommande = async function() {
+  const count = await this.countDocuments();
+  const year = new Date().getFullYear();
+  return `CMD-${year}-${(count + 1).toString().padStart(4, '0')}`;
 };
+
+// Méthode pour calculer les montants
+orderSchema.methods.calculerMontants = function() {
+  this.montantHT = this.articles.reduce((total, article) => {
+    return total + (article.quantite * article.prixUnitaire);
+  }, 0);
+  
+  this.montantTVA = this.montantHT * (this.tauxTVA / 100);
+  this.montantTTC = this.montantHT + this.montantTVA;
+};
+
+// Méthode pour confirmer la commande
+orderSchema.methods.confirmerCommande = function() {
+  if (this.statut === 'brouillon') {
+    this.statut = 'confirmee';
+    this.dateConfirmation = new Date();
+    return this.save();
+  }
+  throw new Error('Cette commande ne peut pas être confirmée');
+};
+
+// Hook pre-save pour calculer les montants
+orderSchema.pre('save', function(next) {
+  this.calculerMontants();
+  next();
+});
+
+// Index pour améliorer les performances
+orderSchema.index({ numeroCommande: 1 });
+orderSchema.index({ clientId: 1 });
+orderSchema.index({ statut: 1 });
+orderSchema.index({ createdAt: -1 });
 
 export default mongoose.model('Order', orderSchema);

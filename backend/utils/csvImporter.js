@@ -4,6 +4,8 @@ import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import Order from '../models/Order.js';
 import User from '../models/User.js';
+import Client from '../models/Client.js';
+import Article from '../models/Article.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,8 +22,15 @@ const parseDate = (dateStr) => {
 // Importation des commandes depuis Book2.csv
 export const importOrdersFromCSV = async () => {
   try {
-    await Order.deleteMany({});
-    console.log('🗑️ Anciennes commandes supprimées');
+    // Vérifier si des commandes existent déjà
+    const existingOrdersCount = await Order.countDocuments();
+    if (existingOrdersCount > 0) {
+      console.log(`✅ ${existingOrdersCount} commandes déjà présentes en base`);
+      return await Order.find().limit(10);
+    }
+
+    // Créer des clients et articles par défaut
+    await createDefaultClientsAndArticles();
 
     const csvPath = path.join(__dirname, '../../data/Book2.csv');
     if (!fs.existsSync(csvPath)) {
@@ -36,45 +45,8 @@ export const importOrdersFromCSV = async () => {
       return await createSampleOrders();
     }
 
-    const dataLines = lines.slice(1);
-    const orders = [];
-
-    for (const line of dataLines) {
-      const columns = line.split(';').map(col => col.trim());
-      if (columns.length < 18) continue;
-
-      const confirmations = [];
-      for (let i = 0; i < 10; i++) {
-        const qIndex = 12 + (i * 2);
-        const dIndex = 13 + (i * 2);
-        const quantite = parseInt(columns[qIndex]) || 0;
-        const date = parseDate(columns[dIndex]);
-        if (quantite > 0 && date) confirmations.push({ quantite, date });
-      }
-
-      const order = {
-        technologie: columns[0] || 'TON111',
-        familleProduit: columns[1] || 'APS BulkNiv2',
-        groupeCouverture: columns[2] || 'PF',
-        quantiteCommandee: parseInt(columns[3]) || 1,
-        quantiteExpediee: parseInt(columns[4]) || 0,
-        quantiteALivrer: parseInt(columns[5]) || 0,
-        quantiteEnPreparation: parseInt(columns[6]) || 0,
-        clientLivreId: columns[7] || '32290',
-        clientLivreFinal: columns[8] || 'ARMOR PRINT SOLUTIONS S.A.S.',
-        dateCreation: parseDate(columns[9]) || new Date(),
-        typeCommande: columns[10] || 'ZIG',
-        dateLivraison: parseDate(columns[11]) || new Date(),
-        confirmations,
-        unite: columns[17] || 'PCE'
-      };
-
-      orders.push(order);
-    }
-
-    const result = await Order.insertMany(orders);
-    console.log(`✅ ${result.length} commandes importées depuis Book2.csv`);
-    return result;
+    // Créer des commandes d'exemple avec le nouveau format
+    return await createSampleOrders();
   } catch (error) {
     console.error('❌ Erreur import commandes :', error);
     const count = await Order.countDocuments();
@@ -133,48 +105,135 @@ export const importUsersFromCSV = async () => {
   }
 };
 
+// Créer des clients et articles par défaut
+const createDefaultClientsAndArticles = async () => {
+  // Créer des clients par défaut
+  const clientsCount = await Client.countDocuments();
+  if (clientsCount === 0) {
+    const defaultClients = [
+      {
+        nom: 'ARMOR PRINT SOLUTIONS S.A.S.',
+        email: 'contact@armor.com',
+        telephone: '02 96 54 71 00',
+        adresse: {
+          rue: 'Zone Industrielle de Kergaradec',
+          ville: 'La Chapelle-sur-Erdre',
+          codePostal: '44240',
+          pays: 'France'
+        }
+      },
+      {
+        nom: 'TECH SOLUTIONS SARL',
+        email: 'info@techsolutions.fr',
+        telephone: '01 23 45 67 89',
+        adresse: {
+          rue: '15 Avenue des Technologies',
+          ville: 'Paris',
+          codePostal: '75001',
+          pays: 'France'
+        }
+      }
+    ];
+
+    await Client.insertMany(defaultClients);
+    console.log(`✅ ${defaultClients.length} clients par défaut créés`);
+  }
+
+  // Créer des articles par défaut
+  const articlesCount = await Article.countDocuments();
+  if (articlesCount === 0) {
+    const defaultArticles = [
+      {
+        numeroArticle: 'TON111',
+        designation: 'Toner compatible HP CE390A',
+        technologie: 'TON111',
+        familleProduit: 'APS BulkNiv2',
+        prixUnitaire: 45.50,
+        unite: 'PCE',
+        stock: 100
+      },
+      {
+        numeroArticle: 'TON121',
+        designation: 'Toner compatible Canon CRG-728',
+        technologie: 'TON121',
+        familleProduit: 'APS BulkNiv2',
+        prixUnitaire: 52.30,
+        unite: 'PCE',
+        stock: 75
+      },
+      {
+        numeroArticle: 'TON120',
+        designation: 'Toner compatible Brother TN-2320',
+        technologie: 'TON120',
+        familleProduit: 'APS Finished Product',
+        prixUnitaire: 38.90,
+        unite: 'PCE',
+        stock: 150
+      }
+    ];
+
+    await Article.insertMany(defaultArticles);
+    console.log(`✅ ${defaultArticles.length} articles par défaut créés`);
+  }
+};
+
 // Commandes d'exemple
 const createSampleOrders = async () => {
   const existing = await Order.countDocuments();
   if (existing > 0) return [];
 
+  // Récupérer les clients et articles par défaut
+  const clients = await Client.find().limit(2);
+  const articles = await Article.find().limit(3);
+
+  if (clients.length === 0 || articles.length === 0) {
+    console.log('⚠️ Pas de clients ou articles pour créer des commandes d\'exemple');
+    return [];
+  }
+
   const sampleOrders = [
     {
-      technologie: 'TON111',
-      familleProduit: 'APS BulkNiv2',
-      groupeCouverture: 'PF',
-      quantiteCommandee: 4,
-      quantiteExpediee: 0,
-      quantiteALivrer: 4,
-      quantiteEnPreparation: 0,
-      clientLivreId: '32290',
-      clientLivreFinal: 'ARMOR PRINT SOLUTIONS S.A.S.',
-      dateCreation: new Date('2024-02-05'),
-      typeCommande: 'ZIG',
-      dateLivraison: new Date('2024-02-27'),
-      confirmations: [
-        { quantite: 4, date: new Date('2024-05-07') }
+      numeroCommande: await Order.genererNumeroCommande(),
+      clientId: clients[0]._id,
+      articles: [
+        {
+          articleId: articles[0]._id,
+          numeroArticle: articles[0].numeroArticle,
+          designation: articles[0].designation,
+          quantite: 4,
+          prixUnitaire: articles[0].prixUnitaire,
+          unite: articles[0].unite
+        }
       ],
-      unite: 'PCE'
+      typeCommande: 'ZIG',
+      dateLivraison: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Dans 30 jours
+      statut: 'confirmee',
+      dateConfirmation: new Date()
     },
     {
-      technologie: 'TON121',
-      familleProduit: 'APS BulkNiv2',
-      groupeCouverture: 'PF',
-      quantiteCommandee: 4,
-      quantiteExpediee: 1,
-      quantiteALivrer: 3,
-      quantiteEnPreparation: 0,
-      clientLivreId: '32290',
-      clientLivreFinal: 'ARMOR PRINT SOLUTIONS S.A.S.',
-      dateCreation: new Date('2024-02-05'),
-      typeCommande: 'ZIG',
-      dateLivraison: new Date('2024-02-27'),
-      confirmations: [
-        { quantite: 1, date: new Date('2024-02-20') },
-        { quantite: 3, date: new Date('2024-05-07') }
+      numeroCommande: await Order.genererNumeroCommande(),
+      clientId: clients[1]._id,
+      articles: [
+        {
+          articleId: articles[1]._id,
+          numeroArticle: articles[1].numeroArticle,
+          designation: articles[1].designation,
+          quantite: 2,
+          prixUnitaire: articles[1].prixUnitaire,
+          unite: articles[1].unite
+        },
+        {
+          articleId: articles[2]._id,
+          numeroArticle: articles[2].numeroArticle,
+          designation: articles[2].designation,
+          quantite: 3,
+          prixUnitaire: articles[2].prixUnitaire,
+          unite: articles[2].unite
+        }
       ],
-      unite: 'PCE'
+      typeCommande: 'ZIG',
+      dateLivraison: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // Dans 15 jours
+      statut: 'brouillon'
     }
   ];
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Save, 
   X, 
@@ -8,7 +8,10 @@ import {
   Calendar,
   CheckCircle,
   AlertCircle,
-  ArrowLeft
+  ArrowLeft,
+  Plus,
+  Trash2,
+  Search
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
@@ -17,17 +20,48 @@ interface AddOrderProps {
   onPageChange: (page: string) => void;
 }
 
-interface OrderFormData {
-  clientFinal: string;
-  designation: string;
+interface Client {
+  _id: string;
+  nom: string;
+  email: string;
+  telephone?: string;
+  adresse?: {
+    rue?: string;
+    ville?: string;
+    codePostal?: string;
+    pays?: string;
+  };
+}
+
+interface Article {
+  _id: string;
   numeroArticle: string;
-  quantiteCommandee: number;
-  dateLivraison: string;
-  commandeConfirmee: boolean;
+  designation: string;
   technologie: string;
   familleProduit: string;
-  typCommande: string;
+  prixUnitaire: number;
   unite: string;
+  stock: number;
+  stockReserve: number;
+  stockDisponible: number;
+}
+
+interface ArticleCommande {
+  articleId: string;
+  numeroArticle: string;
+  designation: string;
+  quantite: number;
+  prixUnitaire: number;
+  unite: string;
+  stockDisponible: number;
+}
+
+interface OrderFormData {
+  clientId: string;
+  articles: ArticleCommande[];
+  dateLivraison: string;
+  typeCommande: string;
+  notes: string;
 }
 
 const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
@@ -36,33 +70,56 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
+  const [clients, setClients] = useState<Client[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [showArticleModal, setShowArticleModal] = useState(false);
+  const [articleSearch, setArticleSearch] = useState('');
+  
   const [formData, setFormData] = useState<OrderFormData>({
-    clientFinal: '',
-    designation: '',
-    numeroArticle: '',
-    quantiteCommandee: 1,
+    clientId: '',
+    articles: [],
     dateLivraison: '',
-    commandeConfirmee: false,
-    technologie: '',
-    familleProduit: 'APS BulkNiv2',
-    typCommande: 'ZIG',
-    unite: 'PCE'
+    typeCommande: 'ZIG',
+    notes: ''
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  // Charger les clients et articles
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [clientsResponse, articlesResponse] = await Promise.all([
+          axios.get('/api/clients'),
+          axios.get('/api/articles')
+        ]);
+
+        if (clientsResponse.data.success) {
+          setClients(clientsResponse.data.data);
+        }
+
+        if (articlesResponse.data.success) {
+          setArticles(articlesResponse.data.data);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des données:', error);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     onPageChange(tab);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
     
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : 
-              type === 'number' ? parseFloat(value) || 0 : value
+      [name]: value
     }));
 
     // Clear error when user starts typing
@@ -71,23 +128,80 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
     }
   };
 
+  const handleAddArticle = (article: Article) => {
+    // Vérifier si l'article n'est pas déjà ajouté
+    const existingArticle = formData.articles.find(a => a.articleId === article._id);
+    if (existingArticle) {
+      setMessage({ type: 'error', text: 'Cet article est déjà dans la commande' });
+      return;
+    }
+
+    const newArticle: ArticleCommande = {
+      articleId: article._id,
+      numeroArticle: article.numeroArticle,
+      designation: article.designation,
+      quantite: 1,
+      prixUnitaire: article.prixUnitaire,
+      unite: article.unite,
+      stockDisponible: article.stockDisponible
+    };
+
+    setFormData(prev => ({
+      ...prev,
+      articles: [...prev.articles, newArticle]
+    }));
+
+    setShowArticleModal(false);
+    setArticleSearch('');
+    setMessage(null);
+  };
+
+  const handleRemoveArticle = (articleId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      articles: prev.articles.filter(a => a.articleId !== articleId)
+    }));
+  };
+
+  const handleQuantityChange = (articleId: string, quantite: number) => {
+    setFormData(prev => ({
+      ...prev,
+      articles: prev.articles.map(article => 
+        article.articleId === articleId 
+          ? { ...article, quantite: Math.max(1, quantite) }
+          : article
+      )
+    }));
+  };
+
+  const calculateTotals = () => {
+    const montantHT = formData.articles.reduce((total, article) => {
+      return total + (article.quantite * article.prixUnitaire);
+    }, 0);
+    
+    const montantTVA = montantHT * 0.20;
+    const montantTTC = montantHT + montantTVA;
+
+    return { montantHT, montantTVA, montantTTC };
+  };
+
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
-    if (!formData.clientFinal.trim()) {
-      newErrors.clientFinal = 'Le nom du client est requis';
+    if (!formData.clientId) {
+      newErrors.clientId = 'Veuillez sélectionner un client';
     }
 
-    if (!formData.designation.trim()) {
-      newErrors.designation = 'La désignation de l\'article est requise';
+    if (formData.articles.length === 0) {
+      newErrors.articles = 'Veuillez ajouter au moins un article';
     }
 
-    if (!formData.numeroArticle.trim()) {
-      newErrors.numeroArticle = 'Le numéro d\'article est requis';
-    }
-
-    if (formData.quantiteCommandee <= 0) {
-      newErrors.quantiteCommandee = 'La quantité doit être supérieure à 0';
+    // Vérifier les stocks
+    for (const article of formData.articles) {
+      if (article.quantite > article.stockDisponible) {
+        newErrors.articles = `Stock insuffisant pour ${article.numeroArticle}`;
+        break;
+      }
     }
 
     if (!formData.dateLivraison) {
@@ -100,24 +214,8 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
       }
     }
 
-    if (!formData.technologie.trim()) {
-      newErrors.technologie = 'La technologie est requise';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
-
-  const generateOrderId = (): string => {
-    // Générer un ID unique basé sur timestamp et nombre aléatoire
-    const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000);
-    return `47${timestamp.toString().slice(-8)}${random.toString().padStart(3, '0')}`;
-  };
-
-  const generatePoste = (): string => {
-    // Générer un numéro de poste aléatoire entre 100 et 999
-    return Math.floor(Math.random() * 900 + 100).toString();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -132,24 +230,15 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
     setLoading(true);
 
     try {
-      // Préparer les données de la commande
       const orderData = {
-        id: generateOrderId(),
-        poste: generatePoste(),
-        numeroArticle: formData.numeroArticle,
-        designation: formData.designation,
-        technologie: formData.technologie,
-        familleProduit: formData.familleProduit,
-        quantiteCommandee: formData.quantiteCommandee,
-        quantiteExpediee: 0,
-        quantiteALivrer: formData.quantiteCommandee,
-        quantiteEnPreparation: 0,
-        clientFinal: formData.clientFinal,
-        dateCreation: new Date().toISOString().split('T')[0],
-        dateConfirmation: formData.commandeConfirmee ? new Date().toISOString().split('T')[0] : undefined,
-        typCommande: formData.typCommande,
+        clientId: formData.clientId,
+        articles: formData.articles.map(article => ({
+          articleId: article.articleId,
+          quantite: article.quantite
+        })),
         dateLivraison: formData.dateLivraison,
-        unite: formData.unite
+        typeCommande: formData.typeCommande,
+        notes: formData.notes
       };
 
       const response = await axios.post('/api/orders', orderData);
@@ -159,16 +248,11 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
         
         // Reset du formulaire après succès
         setFormData({
-          clientFinal: '',
-          designation: '',
-          numeroArticle: '',
-          quantiteCommandee: 1,
+          clientId: '',
+          articles: [],
           dateLivraison: '',
-          commandeConfirmee: false,
-          technologie: '',
-          familleProduit: 'APS BulkNiv2',
-          typCommande: 'ZIG',
-          unite: 'PCE'
+          typeCommande: 'ZIG',
+          notes: ''
         });
 
         // Redirection vers la gestion des commandes après 2 secondes
@@ -192,6 +276,14 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
   const handleCancel = () => {
     onPageChange('orders');
   };
+
+  const filteredArticles = articles.filter(article =>
+    article.numeroArticle.toLowerCase().includes(articleSearch.toLowerCase()) ||
+    article.designation.toLowerCase().includes(articleSearch.toLowerCase()) ||
+    article.technologie.toLowerCase().includes(articleSearch.toLowerCase())
+  );
+
+  const { montantHT, montantTVA, montantTTC } = calculateTotals();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
@@ -270,7 +362,7 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
       </header>
 
       {/* Contenu principal */}
-      <main className="max-w-4xl mx-auto px-6 py-8">
+      <main className="max-w-6xl mx-auto px-6 py-8">
         {/* En-tête de la page */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
@@ -283,299 +375,339 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
             </button>
             <div>
               <h1 className="text-3xl font-bold text-slate-800 mb-2">Ajouter une commande</h1>
-              <p className="text-slate-600">Créez une nouvelle commande dans le système</p>
+              <p className="text-slate-600">Créez une nouvelle commande multi-articles</p>
             </div>
           </div>
         </div>
 
-        {/* Formulaire d'ajout */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-          <div className="px-6 py-4 border-b border-slate-200">
-            <h2 className="text-xl font-semibold text-slate-800 flex items-center">
-              <Package className="w-6 h-6 mr-2 text-blue-600" />
-              Informations de la commande
-            </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Formulaire principal */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+              <div className="px-6 py-4 border-b border-slate-200">
+                <h2 className="text-xl font-semibold text-slate-800 flex items-center">
+                  <Package className="w-6 h-6 mr-2 text-blue-600" />
+                  Informations de la commande
+                </h2>
+              </div>
+
+              <form onSubmit={handleSubmit} className="p-6">
+                {/* Message de succès/erreur */}
+                {message && (
+                  <div className={`mb-6 p-4 rounded-lg flex items-center ${
+                    message.type === 'error' 
+                      ? 'bg-red-50 text-red-700 border border-red-200' 
+                      : 'bg-green-50 text-green-700 border border-green-200'
+                  }`}>
+                    {message.type === 'error' ? (
+                      <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+                    ) : (
+                      <CheckCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+                    )}
+                    <span className="text-sm font-medium">{message.text}</span>
+                  </div>
+                )}
+
+                <div className="space-y-6">
+                  {/* Sélection du client */}
+                  <div className="space-y-2">
+                    <label htmlFor="clientId" className="block text-sm font-medium text-slate-700">
+                      <User className="w-4 h-4 inline mr-1" />
+                      Client *
+                    </label>
+                    <select
+                      id="clientId"
+                      name="clientId"
+                      value={formData.clientId}
+                      onChange={handleInputChange}
+                      className={`w-full px-4 py-3 border-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                        errors.clientId 
+                          ? 'border-red-300 focus:border-red-500' 
+                          : 'border-slate-200 focus:border-blue-500 hover:border-slate-300'
+                      }`}
+                    >
+                      <option value="">Sélectionnez un client</option>
+                      {clients.map(client => (
+                        <option key={client._id} value={client._id}>
+                          {client.nom} - {client.email}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.clientId && (
+                      <p className="text-sm text-red-600 flex items-center">
+                        <AlertCircle className="w-4 h-4 mr-1" />
+                        {errors.clientId}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Articles */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-medium text-slate-700">
+                        <Package className="w-4 h-4 inline mr-1" />
+                        Articles *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowArticleModal(true)}
+                        className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Ajouter un article
+                      </button>
+                    </div>
+
+                    {/* Liste des articles ajoutés */}
+                    <div className="space-y-3">
+                      {formData.articles.map((article, index) => (
+                        <div key={article.articleId} className="flex items-center space-x-4 p-4 bg-slate-50 rounded-lg">
+                          <div className="flex-1">
+                            <div className="font-medium text-slate-800">{article.numeroArticle}</div>
+                            <div className="text-sm text-slate-600">{article.designation}</div>
+                            <div className="text-xs text-slate-500">
+                              Prix unitaire: {article.prixUnitaire.toFixed(2)}€ | 
+                              Stock disponible: {article.stockDisponible} {article.unite}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="number"
+                              min="1"
+                              max={article.stockDisponible}
+                              value={article.quantite}
+                              onChange={(e) => handleQuantityChange(article.articleId, parseInt(e.target.value) || 1)}
+                              className="w-20 px-2 py-1 border border-slate-300 rounded text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-slate-500">{article.unite}</span>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium text-slate-800">
+                              {(article.quantite * article.prixUnitaire).toFixed(2)}€
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveArticle(article.articleId)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+
+                      {formData.articles.length === 0 && (
+                        <div className="text-center py-8 text-slate-500 border-2 border-dashed border-slate-200 rounded-lg">
+                          <Package className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+                          <p>Aucun article ajouté</p>
+                          <p className="text-sm">Cliquez sur "Ajouter un article" pour commencer</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {errors.articles && (
+                      <p className="text-sm text-red-600 flex items-center">
+                        <AlertCircle className="w-4 h-4 mr-1" />
+                        {errors.articles}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Date de livraison */}
+                  <div className="space-y-2">
+                    <label htmlFor="dateLivraison" className="block text-sm font-medium text-slate-700">
+                      <Calendar className="w-4 h-4 inline mr-1" />
+                      Date de livraison souhaitée *
+                    </label>
+                    <input
+                      type="date"
+                      id="dateLivraison"
+                      name="dateLivraison"
+                      value={formData.dateLivraison}
+                      onChange={handleInputChange}
+                      min={new Date().toISOString().split('T')[0]}
+                      className={`w-full px-4 py-3 border-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                        errors.dateLivraison 
+                          ? 'border-red-300 focus:border-red-500' 
+                          : 'border-slate-200 focus:border-blue-500 hover:border-slate-300'
+                      }`}
+                    />
+                    {errors.dateLivraison && (
+                      <p className="text-sm text-red-600 flex items-center">
+                        <AlertCircle className="w-4 h-4 mr-1" />
+                        {errors.dateLivraison}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Type de commande */}
+                  <div className="space-y-2">
+                    <label htmlFor="typeCommande" className="block text-sm font-medium text-slate-700">
+                      Type de commande
+                    </label>
+                    <select
+                      id="typeCommande"
+                      name="typeCommande"
+                      value={formData.typeCommande}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
+                    >
+                      <option value="ZIG">ZIG (Quantité à produire)</option>
+                      <option value="STD">STD (Produit fini)</option>
+                    </select>
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-2">
+                    <label htmlFor="notes" className="block text-sm font-medium text-slate-700">
+                      Notes (optionnel)
+                    </label>
+                    <textarea
+                      id="notes"
+                      name="notes"
+                      value={formData.notes}
+                      onChange={handleInputChange}
+                      rows={3}
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
+                      placeholder="Informations complémentaires..."
+                    />
+                  </div>
+                </div>
+
+                {/* Boutons d'action */}
+                <div className="flex items-center justify-end space-x-4 mt-8 pt-6 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    className="flex items-center px-6 py-3 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+                  >
+                    <X className="w-5 h-5 mr-2" />
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading || formData.articles.length === 0}
+                    className="flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <Save className="w-5 h-5 mr-2" />
+                    )}
+                    {loading ? 'Création en cours...' : 'Créer la commande'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6">
-            {/* Message de succès/erreur */}
-            {message && (
-              <div className={`mb-6 p-4 rounded-lg flex items-center ${
-                message.type === 'error' 
-                  ? 'bg-red-50 text-red-700 border border-red-200' 
-                  : 'bg-green-50 text-green-700 border border-green-200'
-              }`}>
-                {message.type === 'error' ? (
-                  <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
-                ) : (
-                  <CheckCircle className="w-5 h-5 mr-2 flex-shrink-0" />
-                )}
-                <span className="text-sm font-medium">{message.text}</span>
+          {/* Récapitulatif */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 sticky top-8">
+              <div className="px-6 py-4 border-b border-slate-200">
+                <h3 className="text-lg font-semibold text-slate-800">Récapitulatif</h3>
               </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Nom du client */}
-              <div className="space-y-2">
-                <label htmlFor="clientFinal" className="block text-sm font-medium text-slate-700">
-                  <User className="w-4 h-4 inline mr-1" />
-                  Nom du client *
-                </label>
-                <input
-                  type="text"
-                  id="clientFinal"
-                  name="clientFinal"
-                  value={formData.clientFinal}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-                    errors.clientFinal 
-                      ? 'border-red-300 focus:border-red-500' 
-                      : 'border-slate-200 focus:border-blue-500 hover:border-slate-300'
-                  }`}
-                  placeholder="Ex: ARMOR PRINT SOLUTIONS S.A.S."
-                />
-                {errors.clientFinal && (
-                  <p className="text-sm text-red-600 flex items-center">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    {errors.clientFinal}
-                  </p>
-                )}
-              </div>
-
-              {/* Numéro d'article */}
-              <div className="space-y-2">
-                <label htmlFor="numeroArticle" className="block text-sm font-medium text-slate-700">
-                  <Package className="w-4 h-4 inline mr-1" />
-                  Numéro d'article *
-                </label>
-                <input
-                  type="text"
-                  id="numeroArticle"
-                  name="numeroArticle"
-                  value={formData.numeroArticle}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-                    errors.numeroArticle 
-                      ? 'border-red-300 focus:border-red-500' 
-                      : 'border-slate-200 focus:border-blue-500 hover:border-slate-300'
-                  }`}
-                  placeholder="Ex: 5HBK15535BC000"
-                />
-                {errors.numeroArticle && (
-                  <p className="text-sm text-red-600 flex items-center">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    {errors.numeroArticle}
-                  </p>
-                )}
-              </div>
-
-              {/* Désignation de l'article */}
-              <div className="space-y-2 md:col-span-2">
-                <label htmlFor="designation" className="block text-sm font-medium text-slate-700">
-                  Désignation de l'article *
-                </label>
-                <input
-                  type="text"
-                  id="designation"
-                  name="designation"
-                  value={formData.designation}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-                    errors.designation 
-                      ? 'border-red-300 focus:border-red-500' 
-                      : 'border-slate-200 focus:border-blue-500 hover:border-slate-300'
-                  }`}
-                  placeholder="Ex: RE-HP-CE390-BK /AB-3H"
-                />
-                {errors.designation && (
-                  <p className="text-sm text-red-600 flex items-center">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    {errors.designation}
-                  </p>
-                )}
-              </div>
-
-              {/* Quantité */}
-              <div className="space-y-2">
-                <label htmlFor="quantiteCommandee" className="block text-sm font-medium text-slate-700">
-                  Quantité *
-                </label>
-                <div className="flex space-x-2">
-                  <input
-                    type="number"
-                    id="quantiteCommandee"
-                    name="quantiteCommandee"
-                    min="1"
-                    value={formData.quantiteCommandee}
-                    onChange={handleInputChange}
-                    className={`flex-1 px-4 py-3 border-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-                      errors.quantiteCommandee 
-                        ? 'border-red-300 focus:border-red-500' 
-                        : 'border-slate-200 focus:border-blue-500 hover:border-slate-300'
-                    }`}
-                    placeholder="1"
-                  />
-                  <select
-                    name="unite"
-                    value={formData.unite}
-                    onChange={handleInputChange}
-                    className="px-3 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  >
-                    <option value="PCE">PCE</option>
-                    <option value="KG">KG</option>
-                    <option value="L">L</option>
-                    <option value="M">M</option>
-                  </select>
+              <div className="p-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Articles:</span>
+                    <span className="font-medium">{formData.articles.length}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Quantité totale:</span>
+                    <span className="font-medium">
+                      {formData.articles.reduce((total, article) => total + article.quantite, 0)}
+                    </span>
+                  </div>
+                  <hr className="border-slate-200" />
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Montant HT:</span>
+                    <span className="font-medium">{montantHT.toFixed(2)}€</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">TVA (20%):</span>
+                    <span className="font-medium">{montantTVA.toFixed(2)}€</span>
+                  </div>
+                  <hr className="border-slate-200" />
+                  <div className="flex justify-between text-lg font-semibold">
+                    <span className="text-slate-800">Total TTC:</span>
+                    <span className="text-blue-600">{montantTTC.toFixed(2)}€</span>
+                  </div>
                 </div>
-                {errors.quantiteCommandee && (
-                  <p className="text-sm text-red-600 flex items-center">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    {errors.quantiteCommandee}
-                  </p>
-                )}
-              </div>
-
-              {/* Date de livraison */}
-              <div className="space-y-2">
-                <label htmlFor="dateLivraison" className="block text-sm font-medium text-slate-700">
-                  <Calendar className="w-4 h-4 inline mr-1" />
-                  Date de livraison souhaitée *
-                </label>
-                <input
-                  type="date"
-                  id="dateLivraison"
-                  name="dateLivraison"
-                  value={formData.dateLivraison}
-                  onChange={handleInputChange}
-                  min={new Date().toISOString().split('T')[0]}
-                  className={`w-full px-4 py-3 border-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-                    errors.dateLivraison 
-                      ? 'border-red-300 focus:border-red-500' 
-                      : 'border-slate-200 focus:border-blue-500 hover:border-slate-300'
-                  }`}
-                />
-                {errors.dateLivraison && (
-                  <p className="text-sm text-red-600 flex items-center">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    {errors.dateLivraison}
-                  </p>
-                )}
-              </div>
-
-              {/* Technologie */}
-              <div className="space-y-2">
-                <label htmlFor="technologie" className="block text-sm font-medium text-slate-700">
-                  Technologie *
-                </label>
-                <input
-                  type="text"
-                  id="technologie"
-                  name="technologie"
-                  value={formData.technologie}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-                    errors.technologie 
-                      ? 'border-red-300 focus:border-red-500' 
-                      : 'border-slate-200 focus:border-blue-500 hover:border-slate-300'
-                  }`}
-                  placeholder="Ex: TON111"
-                />
-                {errors.technologie && (
-                  <p className="text-sm text-red-600 flex items-center">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    {errors.technologie}
-                  </p>
-                )}
-              </div>
-
-              {/* Famille de produit */}
-              <div className="space-y-2">
-                <label htmlFor="familleProduit" className="block text-sm font-medium text-slate-700">
-                  Famille de produit
-                </label>
-                <select
-                  id="familleProduit"
-                  name="familleProduit"
-                  value={formData.familleProduit}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
-                >
-                  <option value="APS BulkNiv2">APS BulkNiv2</option>
-                  <option value="APS Finished Product">APS Finished Product</option>
-                  <option value="APS Laser Box">APS Laser Box</option>
-                  <option value="APS Packaging Label">APS Packaging Label</option>
-                  <option value="APS Copier Box">APS Copier Box</option>
-                  <option value="APS Cartridge Label">APS Cartridge Label</option>
-                  <option value="APS Airbag/Insert/Inlay">APS Airbag/Insert/Inlay</option>
-                  <option value="APS Packaging Other">APS Packaging Other</option>
-                </select>
-              </div>
-
-              {/* Type de commande */}
-              <div className="space-y-2">
-                <label htmlFor="typCommande" className="block text-sm font-medium text-slate-700">
-                  Type de commande
-                </label>
-                <select
-                  id="typCommande"
-                  name="typCommande"
-                  value={formData.typCommande}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
-                >
-                  <option value="ZIG">ZIG (Quantité à produire)</option>
-                  <option value="STD">STD (Produit fini)</option>
-                </select>
-              </div>
-
-              {/* Commande confirmée */}
-              <div className="space-y-2 md:col-span-2">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="commandeConfirmee"
-                    name="commandeConfirmee"
-                    checked={formData.commandeConfirmee}
-                    onChange={handleInputChange}
-                    className="w-5 h-5 text-blue-600 border-2 border-slate-300 rounded focus:ring-blue-500 focus:ring-2"
-                  />
-                  <label htmlFor="commandeConfirmee" className="text-sm font-medium text-slate-700 flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-1 text-green-600" />
-                    Commande confirmée immédiatement
-                  </label>
-                </div>
-                <p className="text-xs text-slate-500 ml-8">
-                  Si cochée, la commande sera automatiquement confirmée avec la date d'aujourd'hui
-                </p>
               </div>
             </div>
-
-            {/* Boutons d'action */}
-            <div className="flex items-center justify-end space-x-4 mt-8 pt-6 border-t border-slate-200">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="flex items-center px-6 py-3 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-              >
-                <X className="w-5 h-5 mr-2" />
-                Annuler
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                ) : (
-                  <Save className="w-5 h-5 mr-2" />
-                )}
-                {loading ? 'Création en cours...' : 'Créer la commande'}
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
       </main>
+
+      {/* Modal de sélection d'articles */}
+      {showArticleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-800">Sélectionner un article</h3>
+              <button
+                onClick={() => setShowArticleModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              {/* Barre de recherche */}
+              <div className="mb-4">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={articleSearch}
+                    onChange={(e) => setArticleSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    placeholder="Rechercher par numéro, désignation ou technologie..."
+                  />
+                </div>
+              </div>
+
+              {/* Liste des articles */}
+              <div className="max-h-96 overflow-y-auto space-y-2">
+                {filteredArticles.map(article => (
+                  <div
+                    key={article._id}
+                    onClick={() => handleAddArticle(article)}
+                    className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="font-medium text-slate-800">{article.numeroArticle}</div>
+                        <div className="text-sm text-slate-600">{article.designation}</div>
+                        <div className="text-xs text-slate-500">
+                          {article.technologie} | {article.familleProduit}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium text-slate-800">{article.prixUnitaire.toFixed(2)}€</div>
+                        <div className="text-sm text-slate-600">
+                          Stock: {article.stockDisponible} {article.unite}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {filteredArticles.length === 0 && (
+                  <div className="text-center py-8 text-slate-500">
+                    <Package className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+                    <p>Aucun article trouvé</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

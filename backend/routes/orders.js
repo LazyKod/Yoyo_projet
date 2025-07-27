@@ -1,5 +1,7 @@
 import express from 'express';
 import Order from '../models/Order.js';
+import Client from '../models/Client.js';
+import Article from '../models/Article.js';
 
 const router = express.Router();
 
@@ -13,52 +15,28 @@ router.get('/', async (req, res) => {
     
     if (search) {
       filter.$or = [
-        { clientLivreFinal: { $regex: search, $options: 'i' } },
-        { technologie: { $regex: search, $options: 'i' } },
-        { clientLivreId: { $regex: search, $options: 'i' } }
+        { numeroCommande: { $regex: search, $options: 'i' } }
       ];
     }
     
     if (status === 'confirmed') {
-      filter['confirmations.0'] = { $exists: true };
+      filter.statut = { $ne: 'brouillon' };
     } else if (status === 'unconfirmed') {
-      filter['confirmations.0'] = { $exists: false };
+      filter.statut = 'brouillon';
     }
 
     const orders = await Order.find(filter)
-      .sort({ dateCreation: -1 })
+      .populate('clientId', 'nom email')
+      .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .lean();
-
-    // Transformer les données pour correspondre au format attendu par le frontend
-    const transformedOrders = orders.map(order => ({
-      id: order._id.toString(),
-      poste: order.clientLivreId,
-      numeroArticle: order.technologie,
-      designation: `${order.technologie} - ${order.familleProduit}`,
-      technologie: order.technologie,
-      familleProduit: order.familleProduit,
-      quantiteCommandee: order.quantiteCommandee,
-      quantiteExpediee: order.quantiteExpediee,
-      quantiteALivrer: order.quantiteALivrer,
-      quantiteEnPreparation: order.quantiteEnPreparation,
-      clientFinal: order.clientLivreFinal,
-      dateCreation: order.dateCreation.toISOString().split('T')[0],
-      dateConfirmation: order.confirmations.length > 0 
-        ? order.confirmations[order.confirmations.length - 1].date.toISOString().split('T')[0]
-        : undefined,
-      typCommande: order.typeCommande,
-      dateLivraison: order.dateLivraison.toISOString().split('T')[0],
-      unite: order.unite,
-      confirmations: order.confirmations
-    }));
 
     const total = await Order.countDocuments(filter);
 
     res.json({
       success: true,
-      data: transformedOrders,
+      data: orders,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -79,42 +57,72 @@ router.get('/', async (req, res) => {
 // Route pour créer une nouvelle commande
 router.post('/', async (req, res) => {
   try {
-    const orderData = req.body;
+    const { clientId, articles, dateLivraison, typeCommande, notes } = req.body;
 
     // Validation des champs requis
-    const requiredFields = [
-      'clientFinal', 'technologie', 'quantiteCommandee', 'dateLivraison'
-    ];
+    if (!clientId || !articles || !Array.isArray(articles) || articles.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Client et articles requis'
+      });
+    }
 
-    for (const field of requiredFields) {
-      if (!orderData[field]) {
+    // Vérifier que le client existe
+    const client = await Client.findById(clientId);
+    if (!client) {
+      return res.status(400).json({
+        success: false,
+        message: 'Client non trouvé'
+      });
+    }
+
+    // Vérifier les articles et les stocks
+    const articlesData = [];
+    for (const articleCmd of articles) {
+      const article = await Article.findById(articleCmd.articleId);
+      if (!article) {
         return res.status(400).json({
           success: false,
-          message: `Le champ ${field} est requis`
+          message: `Article ${articleCmd.articleId} non trouvé`
         });
       }
+
+      if (article.stockDisponible < articleCmd.quantite) {
+        return res.status(400).json({
+          success: false,
+          message: `Stock insuffisant pour ${article.numeroArticle}`
+        });
+      }
+
+      articlesData.push({
+        articleId: article._id,
+        numeroArticle: article.numeroArticle,
+        designation: article.designation,
+        quantite: articleCmd.quantite,
+        prixUnitaire: article.prixUnitaire,
+        unite: article.unite
+      });
+
+      // Réserver le stock
+      article.stockReserve += articleCmd.quantite;
+      await article.save();
     }
+
+    // Générer le numéro de commande
+    const numeroCommande = await Order.genererNumeroCommande();
 
     // Créer la nouvelle commande
     const newOrder = new Order({
-      technologie: orderData.technologie,
-      familleProduit: orderData.familleProduit || 'APS BulkNiv2',
-      groupeCouverture: orderData.groupeCouverture || 'PF',
-      quantiteCommandee: orderData.quantiteCommandee,
-      quantiteExpediee: 0,
-      quantiteALivrer: orderData.quantiteCommandee,
-      quantiteEnPreparation: 0,
-      clientLivreId: orderData.clientLivreId || '32290',
-      clientLivreFinal: orderData.clientFinal,
-      dateCreation: new Date(),
-      typeCommande: orderData.typCommande || 'ZIG',
-      dateLivraison: new Date(orderData.dateLivraison),
-      unite: orderData.unite || 'PCE',
-      confirmations: orderData.commandeConfirmee ? 
-        [{ quantite: orderData.quantiteCommandee, date: new Date() }] : []
+      numeroCommande,
+      clientId,
+      articles: articlesData,
+      dateLivraison: new Date(dateLivraison),
+      typeCommande: typeCommande || 'ZIG',
+      notes
     });
 
     const savedOrder = await newOrder.save();
+    await savedOrder.populate('clientId', 'nom email');
 
     res.status(201).json({
       success: true,
@@ -131,18 +139,10 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Route pour confirmer une commande (partiellement ou totalement)
+// Route pour confirmer une commande
 router.put('/:id/confirm', async (req, res) => {
   try {
     const { id } = req.params;
-    const { quantiteConfirmee, dateConfirmation } = req.body;
-
-    if (!quantiteConfirmee || !dateConfirmation) {
-      return res.status(400).json({
-        success: false,
-        message: 'Quantité confirmée et date de confirmation requises'
-      });
-    }
 
     const order = await Order.findById(id);
     if (!order) {
@@ -152,8 +152,15 @@ router.put('/:id/confirm', async (req, res) => {
       });
     }
 
-    // Utiliser la méthode du modèle pour ajouter la confirmation
-    await order.ajouterConfirmation(quantiteConfirmee, new Date(dateConfirmation));
+    if (order.statut !== 'brouillon') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cette commande est déjà confirmée'
+      });
+    }
+
+    await order.confirmerCommande();
+    await order.populate('clientId', 'nom email');
 
     res.json({
       success: true,
@@ -174,7 +181,7 @@ router.put('/:id/confirm', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const order = await Order.findById(id);
+    const order = await Order.findById(id).populate('clientId', 'nom email');
 
     if (!order) {
       return res.status(404).json({
@@ -195,57 +202,12 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Route pour mettre à jour une commande
-router.put('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
-
-    const order = await Order.findByIdAndUpdate(
-      id,
-      {
-        technologie: updateData.technologie,
-        familleProduit: updateData.familleProduit,
-        groupeCouverture: updateData.groupeCouverture,
-        quantiteCommandee: updateData.quantiteCommandee,
-        quantiteALivrer: updateData.quantiteALivrer || updateData.quantiteCommandee,
-        clientLivreFinal: updateData.clientFinal,
-        dateLivraison: new Date(updateData.dateLivraison),
-        typeCommande: updateData.typCommande,
-        unite: updateData.unite
-      },
-      { new: true, runValidators: true }
-    );
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: 'Commande non trouvée'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Commande mise à jour avec succès',
-      data: order
-    });
-
-  } catch (error) {
-    console.error('Erreur lors de la mise à jour de la commande:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur serveur lors de la mise à jour'
-    });
-  }
-});
-
 // Route pour supprimer une commande
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const order = await Order.findByIdAndDelete(id);
-
+    const order = await Order.findById(id);
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -253,10 +215,20 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
+    // Libérer les stocks réservés
+    for (const articleCmd of order.articles) {
+      const article = await Article.findById(articleCmd.articleId);
+      if (article) {
+        article.stockReserve = Math.max(0, article.stockReserve - articleCmd.quantite);
+        await article.save();
+      }
+    }
+
+    await Order.findByIdAndDelete(id);
+
     res.json({
       success: true,
-      message: 'Commande supprimée avec succès',
-      data: order
+      message: 'Commande supprimée avec succès'
     });
 
   } catch (error) {
