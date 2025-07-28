@@ -113,10 +113,8 @@ router.post('/', async (req, res) => {
     }
 
     console.log('✅ Client trouvé pour création:', client.nom);
-    console.log('📍 Adresses du client:', {
-      adresse1: client.adresse1,
-      adresse2: client.adresse2
-    });
+    console.log('📍 Adresse1 du client:', JSON.stringify(client.adresse1, null, 2));
+    console.log('📍 Adresse2 du client:', JSON.stringify(client.adresse2, null, 2));
     
     // Récupérer les informations des articles
     const Article = (await import('../models/Article.js')).default;
@@ -155,7 +153,7 @@ router.post('/', async (req, res) => {
 
     // Créer la nouvelle commande
     const newOrder = new Order({
-      clientLivreId: Math.floor(Math.random() * 90000) + 10000, // Générer un ID client temporaire
+      clientLivreId: client._id.toString(), // Utiliser l'ID MongoDB du client
       clientLivreFinal: client.nom,
       articles: articlesData,
       dateLivraison: new Date(dateLivraison),
@@ -176,16 +174,16 @@ router.post('/', async (req, res) => {
         telephone: client.telephone || '',
         fax: client.fax || '',
         adresse1: {
-          rue: (client.adresse1 && client.adresse1.rue) || '',
-          ville: (client.adresse1 && client.adresse1.ville) || '',
-          codePostal: (client.adresse1 && client.adresse1.codePostal) || '',
-          pays: (client.adresse1 && client.adresse1.pays) || 'France'
+          rue: client.adresse1?.rue || '',
+          ville: client.adresse1?.ville || '',
+          codePostal: client.adresse1?.codePostal || '',
+          pays: client.adresse1?.pays || 'France'
         },
         adresse2: {
-          rue: (client.adresse2 && client.adresse2.rue) || '',
-          ville: (client.adresse2 && client.adresse2.ville) || '',
-          codePostal: (client.adresse2 && client.adresse2.codePostal) || '',
-          pays: (client.adresse2 && client.adresse2.pays) || 'France'
+          rue: client.adresse2?.rue || '',
+          ville: client.adresse2?.ville || '',
+          codePostal: client.adresse2?.codePostal || '',
+          pays: client.adresse2?.pays || 'France'
         },
         memeAdresseLivraison: client.memeAdresseLivraison !== false
       }
@@ -261,23 +259,36 @@ router.get('/:id', async (req, res) => {
     // Récupérer les informations du client
     const Client = (await import('../models/Client.js')).default;
     
-    // Essayer de trouver le client par nom d'abord, puis par entreprise, puis par ID
-    let client = await Client.findById(order.clientLivreId).catch(() => null);
+    console.log('🔍 Recherche client avec clientLivreId:', order.clientLivreId);
     
+    // Essayer de trouver le client par ID MongoDB d'abord
+    let client = null;
+    
+    // Si clientLivreId ressemble à un ObjectId MongoDB
+    if (order.clientLivreId && order.clientLivreId.length === 24) {
+      try {
+        client = await Client.findById(order.clientLivreId);
+        console.log('🔍 Client trouvé par ID MongoDB:', client ? client.nom : 'Aucun');
+      } catch (err) {
+        console.log('❌ Erreur recherche par ID:', err.message);
+      }
+    }
+    
+    // Si pas trouvé, chercher par nom
     if (!client) {
       client = await Client.findOne({ nom: order.clientLivreFinal });
+      console.log('🔍 Client trouvé par nom:', client ? client.nom : 'Aucun');
     }
     
+    // Si toujours pas trouvé, chercher par entreprise
     if (!client) {
       client = await Client.findOne({ entreprise: order.clientLivreFinal });
+      console.log('🔍 Client trouvé par entreprise:', client ? client.nom : 'Aucun');
     }
     
-    console.log('🔍 Recherche client pour:', order.clientLivreFinal);
-    console.log('🔍 Client trouvé:', client ? client.nom : 'Aucun');
-    
     if (client) {
-      console.log('📍 Adresse1 du client:', client.adresse1);
-      console.log('📍 Adresse2 du client:', client.adresse2);
+      console.log('📍 Adresse1 du client:', JSON.stringify(client.adresse1, null, 2));
+      console.log('📍 Adresse2 du client:', JSON.stringify(client.adresse2, null, 2));
     }
     
     let orderWithClient = order.toObject();
@@ -289,16 +300,16 @@ router.get('/:id', async (req, res) => {
         telephone: client.telephone || '',
         fax: client.fax || '',
         adresse1: {
-          rue: (client.adresse1 && client.adresse1.rue) || '',
-          ville: (client.adresse1 && client.adresse1.ville) || '',
-          codePostal: (client.adresse1 && client.adresse1.codePostal) || '',
-          pays: (client.adresse1 && client.adresse1.pays) || 'France'
+          rue: client.adresse1?.rue || '',
+          ville: client.adresse1?.ville || '',
+          codePostal: client.adresse1?.codePostal || '',
+          pays: client.adresse1?.pays || 'France'
         },
         adresse2: {
-          rue: (client.adresse2 && client.adresse2.rue) || '',
-          ville: (client.adresse2 && client.adresse2.ville) || '',
-          codePostal: (client.adresse2 && client.adresse2.codePostal) || '',
-          pays: (client.adresse2 && client.adresse2.pays) || 'France'
+          rue: client.adresse2?.rue || '',
+          ville: client.adresse2?.ville || '',
+          codePostal: client.adresse2?.codePostal || '',
+          pays: client.adresse2?.pays || 'France'
         },
         memeAdresseLivraison: client.memeAdresseLivraison !== false
       };
