@@ -10,6 +10,12 @@ import {
   Award,
   BarChart3,
   PieChart
+  AlertTriangle,
+  TrendingDown,
+  ShoppingCart,
+  Truck,
+  Calendar,
+  Target
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
@@ -33,12 +39,41 @@ interface Order {
   unite: string;
 }
 
+interface Article {
+  _id: string;
+  numeroArticle: string;
+  designation: string;
+  technologie: string;
+  familleProduit: string;
+  prixUnitaire: number;
+  unite: string;
+  stock: number;
+  stockReserve: number;
+  stockDisponible: number;
+  actif: boolean;
+}
+
+interface Client {
+  _id: string;
+  nom: string;
+  entreprise: string;
+  email: string;
+  actif: boolean;
+}
 interface KPIData {
   commandesConfirmees: number;
   commandesAConfirmer: number;
   chiffreAffaires: number;
+  commandesEnRetard: number;
+  stockFaible: number;
+  valeurStock: number;
+  clientsActifs: number;
+  commandesMoyennesParJour: number;
+  tauxConfirmation: number;
   topArticles: Array<{ nom: string; quantite: number }>;
   topClients: Array<{ nom: string; commandes: number }>;
+  articlesStockFaible: Array<{ nom: string; stock: number; seuil: number }>;
+  commandesProchaines: Array<{ client: string; date: string; quantite: number }>;
 }
 
 interface DashboardProps {
@@ -50,31 +85,52 @@ const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
   const [selectedPeriod, setSelectedPeriod] = useState<'1M' | '3M' | '1A'>('1M');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [kpiData, setKpiData] = useState<KPIData>({
     commandesConfirmees: 0,
     commandesAConfirmer: 0,
     chiffreAffaires: 0,
+    commandesEnRetard: 0,
+    stockFaible: 0,
+    valeurStock: 0,
+    clientsActifs: 0,
+    commandesMoyennesParJour: 0,
+    tauxConfirmation: 0,
     topArticles: [],
-    topClients: []
+    topClients: [],
+    articlesStockFaible: [],
+    commandesProchaines: []
   });
 
-  // Charger les commandes depuis le backend
+  // Charger toutes les données depuis le backend
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchAllData = async () => {
       try {
-        const response = await axios.get('/api/orders');
-        if (response.data.success) {
-          setOrders(response.data.data);
+        const [ordersResponse, articlesResponse, clientsResponse] = await Promise.all([
+          axios.get('/api/orders'),
+          axios.get('/api/articles'),
+          axios.get('/api/clients')
+        ]);
+
+        if (ordersResponse.data.success) {
+          setOrders(ordersResponse.data.data);
+        }
+        if (articlesResponse.data.success) {
+          setArticles(articlesResponse.data.data);
+        }
+        if (clientsResponse.data.success) {
+          setClients(clientsResponse.data.data);
         }
       } catch (error) {
-        console.error('Erreur lors du chargement des commandes:', error);
+        console.error('Erreur lors du chargement des données:', error);
       }
     };
 
-    fetchOrders();
+    fetchAllData();
   }, []);
 
-  // Calculer les KPIs basés sur les vraies données et la période sélectionnée
+  // Calculer tous les KPIs basés sur les vraies données et la période sélectionnée
   useEffect(() => {
     const calculateKPIs = (period: string): KPIData => {
       const today = new Date();
@@ -111,11 +167,42 @@ const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
         !order.dateConfirmation || order.dateConfirmation.trim() === ''
       ).length;
 
+      // Calculer les commandes en retard (date de livraison dépassée et non expédiées)
+      const commandesEnRetard = orders.filter(order => {
+        const deliveryDate = new Date(order.dateLivraison);
+        return deliveryDate < today && order.quantiteExpediee < order.quantiteCommandee;
+      }).length;
+
+      // Calculer le taux de confirmation
+      const totalCommandes = commandesConfirmees + commandesAConfirmer;
+      const tauxConfirmation = totalCommandes > 0 ? (commandesConfirmees / totalCommandes) * 100 : 0;
+
+      // Calculer les commandes moyennes par jour
+      const daysDiff = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
+      const commandesMoyennesParJour = daysDiff > 0 ? filteredOrders.length / daysDiff : 0;
+
       // Calculer le chiffre d'affaires (simulation basée sur les quantités)
       // En l'absence de prix unitaire, on estime à 50€ par unité en moyenne
       const chiffreAffaires = filteredOrders.reduce((total, order) => {
         return total + (order.quantiteCommandee * 50); // Prix unitaire estimé
       }, 0);
+
+      // Calculer les KPIs de stock
+      const articlesStockFaible = articles.filter(article => {
+        const seuil = 20; // Seuil d'alerte par défaut
+        return article.stockDisponible <= seuil;
+      });
+
+      const stockFaible = articlesStockFaible.length;
+
+      // Calculer la valeur totale du stock
+      const valeurStock = articles.reduce((total, article) => {
+        return total + (article.stock * article.prixUnitaire);
+      }, 0);
+
+      // Clients actifs (ayant passé au moins une commande dans la période)
+      const clientsAvecCommandes = new Set(filteredOrders.map(order => order.clientFinal));
+      const clientsActifs = clientsAvecCommandes.size;
 
       // Calculer le top 3 des articles (utiliser numeroArticle au lieu de designation)
       const articlesMap = new Map<string, number>();
@@ -141,19 +228,53 @@ const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
         .sort((a, b) => b.commandes - a.commandes)
         .slice(0, 3);
 
+      // Articles avec stock faible (top 5)
+      const articlesStockFaibleTop = articlesStockFaible
+        .map(article => ({
+          nom: article.numeroArticle,
+          stock: article.stockDisponible,
+          seuil: 20
+        }))
+        .sort((a, b) => a.stock - b.stock)
+        .slice(0, 5);
+
+      // Prochaines livraisons (dans les 7 prochains jours)
+      const nextWeek = new Date();
+      nextWeek.setDate(today.getDate() + 7);
+      
+      const commandesProchaines = orders
+        .filter(order => {
+          const deliveryDate = new Date(order.dateLivraison);
+          return deliveryDate >= today && deliveryDate <= nextWeek && order.quantiteExpediee < order.quantiteCommandee;
+        })
+        .map(order => ({
+          client: order.clientFinal,
+          date: order.dateLivraison,
+          quantite: order.quantiteALivrer
+        }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 5);
       return {
         commandesConfirmees,
         commandesAConfirmer,
         chiffreAffaires,
+        commandesEnRetard,
+        stockFaible,
+        valeurStock,
+        clientsActifs,
+        commandesMoyennesParJour,
+        tauxConfirmation,
         topArticles,
-        topClients
+        topClients,
+        articlesStockFaible: articlesStockFaibleTop,
+        commandesProchaines
       };
     };
 
-    if (orders.length > 0) {
+    if (orders.length > 0 || articles.length > 0 || clients.length > 0) {
       setKpiData(calculateKPIs(selectedPeriod));
     }
-  }, [orders, selectedPeriod]);
+  }, [orders, articles, clients, selectedPeriod]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -162,6 +283,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
     }).format(amount);
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit'
+    });
+  };
   const getPeriodLabel = (period: string) => {
     switch (period) {
       case '1M': return 'Ce mois';
@@ -200,6 +327,46 @@ const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
       borderColor: 'border-blue-200'
+    }
+    {
+      title: 'Commandes en retard',
+      value: kpiData.commandesEnRetard.toString(),
+      icon: AlertTriangle,
+      color: 'text-red-600',
+      bgColor: 'bg-red-50',
+      borderColor: 'border-red-200'
+    },
+    {
+      title: 'Articles stock faible',
+      value: kpiData.stockFaible.toString(),
+      icon: TrendingDown,
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-50',
+      borderColor: 'border-yellow-200'
+    },
+    {
+      title: 'Valeur du stock',
+      value: formatCurrency(kpiData.valeurStock),
+      icon: Package,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+      borderColor: 'border-purple-200'
+    },
+    {
+      title: 'Clients actifs',
+      value: kpiData.clientsActifs.toString(),
+      icon: Users,
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-50',
+      borderColor: 'border-indigo-200'
+    },
+    {
+      title: 'Taux de confirmation',
+      value: `${kpiData.tauxConfirmation.toFixed(1)}%`,
+      icon: Target,
+      color: 'text-teal-600',
+      bgColor: 'bg-teal-50',
+      borderColor: 'border-teal-200'
     }
   ];
 
@@ -315,8 +482,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
           </div>
         </div>
 
-        {/* Grille des KPIs principaux */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* Grille des KPIs principaux - 4 colonnes */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {kpiCards.map((kpi, index) => (
             <div
               key={index}
@@ -335,8 +502,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
           ))}
         </div>
 
-        {/* Section Top Articles et Top Clients */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Section détaillée avec 4 widgets */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Top 3 Articles */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <div className="flex items-center justify-between mb-6">
@@ -426,6 +593,88 @@ const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
                 <div className="text-center py-8 text-slate-500">
                   <Users className="w-12 h-12 mx-auto mb-2 text-slate-300" />
                   <p>Aucun client trouvé pour cette période</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Deuxième ligne de widgets */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Articles avec stock faible */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-slate-800 flex items-center">
+                <AlertTriangle className="w-5 h-5 mr-2 text-red-600" />
+                Stock faible
+              </h3>
+              <TrendingDown className="w-5 h-5 text-slate-400" />
+            </div>
+            <div className="space-y-4">
+              {kpiData.articlesStockFaible.length > 0 ? (
+                kpiData.articlesStockFaible.map((article, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100">
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">
+                        !
+                      </div>
+                      <div className="ml-3">
+                        <p className="font-medium text-slate-800 text-sm">{article.nom}</p>
+                        <p className="text-sm text-red-600">Stock: {article.stock} unités</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="w-16 h-2 bg-red-200 rounded-full">
+                        <div 
+                          className="h-full bg-red-500 rounded-full"
+                          style={{ width: `${Math.max(5, (article.stock / article.seuil) * 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-slate-500">
+                  <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-300" />
+                  <p>Tous les stocks sont suffisants</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Prochaines livraisons */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-slate-800 flex items-center">
+                <Truck className="w-5 h-5 mr-2 text-blue-600" />
+                Prochaines livraisons
+              </h3>
+              <Calendar className="w-5 h-5 text-slate-400" />
+            </div>
+            <div className="space-y-4">
+              {kpiData.commandesProchaines.length > 0 ? (
+                kpiData.commandesProchaines.map((commande, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
+                        {formatDate(commande.date)}
+                      </div>
+                      <div className="ml-3">
+                        <p className="font-medium text-slate-800 text-sm">{commande.client}</p>
+                        <p className="text-sm text-blue-600">{commande.quantite} unités</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-slate-500">
+                        {formatDate(commande.date)}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-slate-500">
+                  <Calendar className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+                  <p>Aucune livraison prévue</p>
                 </div>
               )}
             </div>
