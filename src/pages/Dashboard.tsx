@@ -60,6 +60,7 @@ interface Client {
   email: string;
   actif: boolean;
 }
+
 interface KPIData {
   commandesConfirmees: number;
   commandesAConfirmer: number;
@@ -254,6 +255,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
         }))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .slice(0, 5);
+
       return {
         commandesConfirmees,
         commandesAConfirmer,
@@ -289,6 +291,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
       month: '2-digit'
     });
   };
+
   const getPeriodLabel = (period: string) => {
     switch (period) {
       case '1M': return 'Ce mois';
@@ -327,7 +330,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
       borderColor: 'border-blue-200'
-    }
+    },
     {
       title: 'Commandes en retard',
       value: kpiData.commandesEnRetard.toString(),
