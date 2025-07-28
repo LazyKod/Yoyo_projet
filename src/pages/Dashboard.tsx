@@ -9,7 +9,7 @@ import {
   Euro,
   Award,
   BarChart3,
-  PieChart
+  PieChart,
   AlertTriangle,
   TrendingDown,
   ShoppingCart,
