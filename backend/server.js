@@ -8,8 +8,6 @@ import authRoutes from './routes/auth.js';
 import orderRoutes from './routes/orders.js';
 import clientRoutes from './routes/clients.js';
 import articleRoutes from './routes/articles.js';
-import clientRoutes from './routes/clients.js';
-import articleRoutes from './routes/articles.js';
 import { importOrdersFromCSV, importUsersFromCSV } from './utils/csvImporter.js';
 
 dotenv.config();
@@ -37,8 +35,6 @@ const initializeDatabase = async () => {
     
     console.log('✅ Base de données initialisée avec succès');
   } catch (error) {
-    clients: '/api/clients',
-    articles: '/api/articles',
     console.error('❌ Erreur lors de l\'initialisation de la base de données:', error);
   }
 };
@@ -49,8 +45,6 @@ initializeDatabase();
 // Routes API
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/clients', clientRoutes);
-app.use('/api/articles', articleRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/articles', articleRoutes);
 
@@ -79,8 +73,6 @@ if (process.env.NODE_ENV === 'production') {
       endpoints: {
         auth: '/api/auth/login',
         orders: '/api/orders',
-        clients: '/api/clients',
-        articles: '/api/articles',
         health: '/api/health'
       }
     });
@@ -92,7 +84,4 @@ app.listen(PORT, () => {
   console.log(`📡 API disponible sur http://localhost:${PORT}/api`);
   console.log(`🌐 Frontend disponible sur http://localhost:3000`);
 });
-import { startCron } from './cron.js';
-
-startCron();
 
