@@ -243,6 +243,7 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { clientId, articles, dateLivraison, typeCommande, notes } = req.body;
 
+    console.log('Données reçues pour modification:', { clientId, articles, dateLivraison, typeCommande, notes });
     const order = await Order.findById(id);
     if (!order) {
       return res.status(404).json({
@@ -275,6 +276,8 @@ router.put('/:id', async (req, res) => {
       const articlesData = [];
       
       for (const articleReq of articles) {
+        console.log('Traitement article:', articleReq);
+        
         const article = await Article.findById(articleReq.articleId);
         if (!article) {
           return res.status(404).json({
@@ -294,20 +297,22 @@ router.put('/:id', async (req, res) => {
         
         articlesData.push({
           technologie: article.technologie,
-          familleProduit: article.familleProduit,
+          familleProduit: article.familleProduit || 'APS BulkNiv2',
           groupeCouverture: 'PF',
           quantiteCommandee: articleReq.quantite,
           quantiteALivrer: articleReq.quantite,
           quantiteExpediee: 0,
           quantiteEnPreparation: 0,
-          unite: article.unite,
+          unite: article.unite || 'PCE',
           confirmations: []
         });
       }
       
+      console.log('Articles transformés:', articlesData);
       order.articles = articlesData;
     }
 
+    console.log('Commande avant sauvegarde:', order);
     const updatedOrder = await order.save();
 
     res.json({
