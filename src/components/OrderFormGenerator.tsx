@@ -44,6 +44,11 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
     return new Date(dateString).toLocaleDateString('fr-FR');
   };
 
+  // Debug: afficher les données du client
+  console.log('OrderFormGenerator - Données reçues:', {
+    order: order,
+    client: order.client
+  });
   const calculateTotals = () => {
     // Prix estimé par article (à remplacer par les vrais prix depuis la base Articles)
     const prixEstime = 50;

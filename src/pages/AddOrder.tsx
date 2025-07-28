@@ -362,6 +362,8 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
 
       if (response.data.success) {
         const createdOrderData = response.data.data;
+        console.log('Commande créée reçue:', createdOrderData);
+        console.log('Client dans la commande:', createdOrderData.client);
         setCreatedOrder(createdOrderData);
         
         // Si confirmation directe demandée, confirmer la commande

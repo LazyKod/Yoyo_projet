@@ -112,6 +112,7 @@ router.post('/', async (req, res) => {
       });
     }
 
+    console.log('Client trouvé:', client);
     // Récupérer les informations des articles
     const Article = (await import('../models/Article.js')).default;
     const articlesData = [];
@@ -160,19 +161,33 @@ router.post('/', async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
-    // Ajouter les informations du client à la réponse pour le bon de commande
+    // Ajouter les informations complètes du client à la réponse
     const orderWithClient = {
       ...savedOrder.toObject(),
       client: {
-        nom: client.nom,
-        entreprise: client.entreprise,
-        email: client.email,
-        telephone: client.telephone,
-        adresse1: client.adresse1,
-        adresse2: client.adresse2,
-        memeAdresseLivraison: client.memeAdresseLivraison
+        nom: client.nom || '',
+        entreprise: client.entreprise || '',
+        email: client.email || '',
+        telephone: client.telephone || '',
+        fax: client.fax || '',
+        adresse1: {
+          rue: client.adresse1?.rue || '',
+          ville: client.adresse1?.ville || '',
+          codePostal: client.adresse1?.codePostal || '',
+          pays: client.adresse1?.pays || 'France'
+        },
+        adresse2: {
+          rue: client.adresse2?.rue || '',
+          ville: client.adresse2?.ville || '',
+          codePostal: client.adresse2?.codePostal || '',
+          pays: client.adresse2?.pays || 'France'
+        },
+        memeAdresseLivraison: client.memeAdresseLivraison !== false
       }
     };
+
+    console.log('Commande avec client:', JSON.stringify(orderWithClient.client, null, 2));
+
     res.status(201).json({
       success: true,
       message: 'Commande créée avec succès',
@@ -240,25 +255,60 @@ router.get('/:id', async (req, res) => {
 
     // Récupérer les informations du client
     const Client = (await import('../models/Client.js')).default;
-    const client = await Client.findOne({ 
-      $or: [
-        { nom: order.clientLivreFinal },
-        { entreprise: order.clientLivreFinal }
-      ]
-    });
+    
+    // Essayer de trouver le client par nom d'abord, puis par entreprise
+    let client = await Client.findOne({ nom: order.clientLivreFinal });
+    if (!client) {
+      client = await Client.findOne({ entreprise: order.clientLivreFinal });
+    }
+    
+    console.log('Recherche client pour:', order.clientLivreFinal);
+    console.log('Client trouvé:', client ? 'Oui' : 'Non');
     
     let orderWithClient = order.toObject();
     if (client) {
+      console.log('Adresses du client:', {
+        adresse1: client.adresse1,
+        adresse2: client.adresse2,
+        memeAdresseLivraison: client.memeAdresseLivraison
+      });
+      
       orderWithClient.client = {
-        nom: client.nom,
+        nom: client.nom || '',
         entreprise: client.entreprise || '',
-        email: client.email,
+        email: client.email || '',
         telephone: client.telephone || '',
-        adresse1: client.adresse1 || { rue: '', ville: '', codePostal: '', pays: 'France' },
-        adresse2: client.adresse2 || { rue: '', ville: '', codePostal: '', pays: 'France' },
+        fax: client.fax || '',
+        adresse1: {
+          rue: client.adresse1?.rue || '',
+          ville: client.adresse1?.ville || '',
+          codePostal: client.adresse1?.codePostal || '',
+          pays: client.adresse1?.pays || 'France'
+        },
+        adresse2: {
+          rue: client.adresse2?.rue || '',
+          ville: client.adresse2?.ville || '',
+          codePostal: client.adresse2?.codePostal || '',
+          pays: client.adresse2?.pays || 'France'
+        },
         memeAdresseLivraison: client.memeAdresseLivraison !== false
       };
+    } else {
+      console.log('Client non trouvé, utilisation des données par défaut');
+      orderWithClient.client = {
+        nom: order.clientLivreFinal,
+        entreprise: order.clientLivreFinal,
+        email: '',
+        telephone: '',
+        fax: '',
+        adresse1: { rue: '', ville: '', codePostal: '', pays: 'France' },
+        adresse2: { rue: '', ville: '', codePostal: '', pays: 'France' },
+        memeAdresseLivraison: true
+      };
     }
+    
+    console.log('Réponse finale client:', JSON.stringify(orderWithClient.client, null, 2));
+    
     res.json({
       success: true,
       data: orderWithClient
