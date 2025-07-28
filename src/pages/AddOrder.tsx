@@ -11,10 +11,12 @@ import {
   ArrowLeft,
   Plus,
   Trash2,
-  Search
+  Search,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
+import OrderFormGenerator from '../components/OrderFormGenerator';
 
 interface AddOrderProps {
   onPageChange: (page: string) => void;
@@ -63,6 +65,7 @@ interface OrderFormData {
   dateLivraison: string;
   typeCommande: string;
   notes: string;
+  confirmerDirectement: boolean;
 }
 
 const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
@@ -76,13 +79,16 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
   const [articles, setArticles] = useState<Article[]>([]);
   const [showArticleModal, setShowArticleModal] = useState(false);
   const [articleSearch, setArticleSearch] = useState('');
+  const [showOrderForm, setShowOrderForm] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<any>(null);
   
   const [formData, setFormData] = useState<OrderFormData>({
     clientId: '',
     articles: [],
     dateLivraison: '',
     typeCommande: 'ZIG',
-    notes: ''
+    notes: '',
+    confirmerDirectement: false
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -109,7 +115,8 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
             articles: [], // On va reconstruire les articles
             dateLivraison: order.dateLivraison ? order.dateLivraison.split('T')[0] : '',
             typeCommande: order.typeCommande || 'ZIG',
-            notes: order.notes || ''
+            notes: order.notes || '',
+            confirmerDirectement: order.statut === 'confirmee'
           });
           
           // Trouver le client correspondant
@@ -352,26 +359,45 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
       }
 
       if (response.data.success) {
+        const createdOrderData = response.data.data;
+        setCreatedOrder(createdOrderData);
+        
+        // Si confirmation directe demandée, confirmer la commande
+        if (formData.confirmerDirectement && !editOrderId) {
+          try {
+            const confirmResponse = await axios.put(`/api/orders/${createdOrderData._id}/confirm`);
+            if (confirmResponse.data.success) {
+              setMessage({ 
+                type: 'success', 
+                text: 'Commande créée et confirmée avec succès !' 
+              });
+            }
+          } catch (confirmError) {
+            console.error('Erreur lors de la confirmation automatique:', confirmError);
+            setMessage({ 
+              type: 'success', 
+              text: 'Commande créée avec succès ! (Erreur lors de la confirmation automatique)' 
+            });
+          }
+        } else {
+          setMessage({ 
+            type: 'success', 
+            text: editOrderId ? 'Commande modifiée avec succès !' : 'Commande créée avec succès !' 
+          });
+        }
         setMessage({ 
           type: 'success', 
           text: editOrderId ? 'Commande modifiée avec succès !' : 'Commande créée avec succès !' 
         });
         
-        // Reset du formulaire après succès
-        if (!editOrderId) {
-          setFormData({
-            clientId: '',
-            articles: [],
             dateLivraison: '',
             typeCommande: 'ZIG',
-            notes: ''
+            notes: '',
+            confirmerDirectement: false
           });
         }
 
-        // Redirection vers la gestion des commandes après 2 secondes
-        setTimeout(() => {
-          onPageChange('current-orders');
-        }, 2000);
+            notes: '',
       } else {
         setMessage({ 
           type: 'error', 
@@ -389,6 +415,27 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
     }
   };
 
+  const handleSubmitAndGenerateForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleSubmit(e);
+    
+    // Attendre un peu pour que la commande soit créée
+    setTimeout(() => {
+      if (createdOrder) {
+        setShowOrderForm(true);
+      }
+    }, 1000);
+  };
+
+  const handleGenerateOrderForm = () => {
+    if (createdOrder) {
+      setShowOrderForm(true);
+    }
+  };
+
+  const handleReturnToOrders = () => {
+    onPageChange('current-orders');
+  };
   const handleCancel = () => {
     onPageChange('current-orders');
   };
@@ -726,6 +773,23 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
                       placeholder="Informations complémentaires..."
                     />
                   </div>
+
+                  {/* Confirmation directe (seulement en mode création) */}
+                  {!editOrderId && (
+                    <div className="flex items-center space-x-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <input
+                        type="checkbox"
+                        id="confirmerDirectement"
+                        name="confirmerDirectement"
+                        checked={formData.confirmerDirectement}
+                        onChange={(e) => setFormData(prev => ({ ...prev, confirmerDirectement: e.target.checked }))}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
+                      />
+                      <label htmlFor="confirmerDirectement" className="text-sm font-medium text-blue-800">
+                        Confirmer automatiquement cette commande après création
+                      </label>
+                    </div>
+                  )}
                 </div>
 
                 {/* Boutons d'action */}
@@ -738,21 +802,63 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
                     <X className="w-5 h-5 mr-2" />
                     Annuler
                   </button>
-                  <button
-                    type="submit"
-                    disabled={loading || formData.articles.length === 0}
-                    className="flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    ) : (
-                      <Save className="w-5 h-5 mr-2" />
-                    )}
-                    {loading ? 
-                      (editOrderId ? 'Modification en cours...' : 'Création en cours...') : 
-                      (editOrderId ? 'Modifier la commande' : 'Créer la commande')
-                    }
-                  </button>
+                  
+                  {/* Boutons conditionnels selon l'état */}
+                  {createdOrder ? (
+                    <div className="flex items-center space-x-4">
+                      <button
+                        type="button"
+                        onClick={handleGenerateOrderForm}
+                        className="flex items-center px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl"
+                      >
+                        <FileText className="w-5 h-5 mr-2" />
+                        Générer bon de commande
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleReturnToOrders}
+                        className="flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl"
+                      >
+                        <CheckCircle className="w-5 h-5 mr-2" />
+                        Voir les commandes
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-4">
+                      <button
+                        type="submit"
+                        disabled={loading || formData.articles.length === 0}
+                        className="flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
+                      >
+                        {loading ? (
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        ) : (
+                          <Save className="w-5 h-5 mr-2" />
+                        )}
+                        {loading ? 
+                          (editOrderId ? 'Modification en cours...' : 'Création en cours...') : 
+                          (editOrderId ? 'Modifier la commande' : 'Enregistrer la commande')
+                        }
+                      </button>
+                      
+                      {/* Bouton pour enregistrer et générer le bon de commande (seulement en mode création) */}
+                      {!editOrderId && (
+                        <button
+                          type="button"
+                          onClick={handleSubmitAndGenerateForm}
+                          disabled={loading || formData.articles.length === 0}
+                          className="flex items-center px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
+                        >
+                          {loading ? (
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          ) : (
+                            <FileText className="w-5 h-5 mr-2" />
+                          )}
+                          {loading ? 'Création en cours...' : 'Enregistrer et générer bon'}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </form>
             </div>
@@ -864,6 +970,14 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de génération de bon de commande */}
+      {showOrderForm && createdOrder && (
+        <OrderFormGenerator
+          order={createdOrder}
+          onClose={() => setShowOrderForm(false)}
+        />
       )}
     </div>
   );
