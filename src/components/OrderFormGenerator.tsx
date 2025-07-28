@@ -131,16 +131,12 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
           <div className="mb-6">
             <h2 className="text-lg font-bold mb-2">ARMOR PRINT SOLUTIONS</h2>
             <div className="text-sm text-slate-600">
-              <p>[Zone Industrielle de Kergaradec]</p>
-              <p>[La Chapelle-sur-Erdre] :</p>
-              <p>[Loire-Atlantique/Pays de la Loire] :</p>
-              <p>[44240] :</p>
-              <p>[02 96 54 71 00] : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [Fax] :</p>
-              <p>[contact@armor.com] :</p>
+              <p>7, Rue Balouch El Hassan :</p>
+              <p>Casablanca :</p>
+              <p>20100 :</p>
+              <p>05 22 25 68 31 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [Fax] :</p>
+              <p>contact@armor.com :</p>
             </div>
-            <p className="text-xs mt-2 text-slate-500">
-              Les chiffres ci-après doivent figurer sur toutes les correspondances, bons de livraison, et factures relatives à la commande
-            </p>
           </div>
 
           {/* Numéro de commande */}
@@ -159,7 +155,7 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
                   console.log('🔍 Tentative affichage adresse1 rue:', order.client?.adresse1?.rue);
                   return order.client?.adresse1?.rue || 'Adresse non renseignée';
                 })()}</p>
-                <p>Ville, État/Province, Code Postal : {(() => {
+                <p>Ville, Code Postal : {(() => {
                   const ville = order.client?.adresse1?.ville || '';
                   const codePostal = order.client?.adresse1?.codePostal || '';
                   console.log('🔍 Ville:', ville, 'Code postal:', codePostal);
@@ -183,7 +179,7 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
                   console.log('🔍 Adresse livraison:', adresse);
                   return adresse || 'Adresse non renseignée';
                 })()}</p>
-                <p>Ville, État Cod Postal : {(() => {
+                <p>Ville, Code Postal : {(() => {
                   const useSameAddress = order.client?.memeAdresseLivraison;
                   const ville = useSameAddress ? order.client?.adresse1?.ville : order.client?.adresse2?.ville;
                   const codePostal = useSameAddress ? order.client?.adresse1?.codePostal : order.client?.adresse2?.codePostal;
@@ -254,7 +250,7 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
                 <td className="border border-slate-300 px-3 py-2 text-sm text-right">{sousTotal.toFixed(2)} €</td>
               </tr>
               <tr>
-                <td colSpan={4} className="border border-slate-300 px-3 py-2 text-sm text-right font-bold">TAXE</td>
+                <td colSpan={4} className="border border-slate-300 px-3 py-2 text-sm text-right font-bold">TVA</td>
                 <td className="border border-slate-300 px-3 py-2 text-sm text-right">{taxe.toFixed(2)} €</td>
               </tr>
               <tr>
@@ -271,9 +267,7 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
           {/* Conditions et signatures */}
           <div className="grid grid-cols-2 gap-8 mt-8">
             <div className="text-xs">
-              <p className="mb-2">1. Envoyer trois copies de votre facture.</p>
-              <p className="mb-2">2. Exécuter la commande conformément aux prix, modalités, mode de livraison et spécifications précisées ci-dessus.</p>
-              <p className="mb-2">3. Nous le notifier aussitôt que possible si vous ne pouvez livrer tel que.</p>
+              <p className="mb-2"> Exécuter la commande conformément aux prix, modalités, mode de livraison et spécifications précisées ci-dessus.</p>
             </div>
             <div>
               <div className="mb-8">
