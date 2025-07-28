@@ -432,6 +432,23 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
 
   const handleGenerateOrderForm = () => {
     if (createdOrder) {
+      // Forcer la récupération des données client avant d'ouvrir le modal
+      const fetchOrderWithClient = async () => {
+        try {
+          const response = await axios.get(`/api/orders/${createdOrder._id}`);
+          if (response.data.success) {
+            console.log('Données complètes de la commande:', response.data.data);
+            setCreatedOrder(response.data.data);
+          }
+        } catch (error) {
+          console.error('Erreur lors de la récupération de la commande:', error);
+        }
+      };
+      
+      fetchOrderWithClient().then(() => {
+        setShowOrderForm(true);
+      });
+    } else {
       setShowOrderForm(true);
     }
   };

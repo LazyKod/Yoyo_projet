@@ -112,7 +112,12 @@ router.post('/', async (req, res) => {
       });
     }
 
-    console.log('Client trouvé:', client);
+    console.log('✅ Client trouvé pour création:', client.nom);
+    console.log('📍 Adresses du client:', {
+      adresse1: client.adresse1,
+      adresse2: client.adresse2
+    });
+    
     // Récupérer les informations des articles
     const Article = (await import('../models/Article.js')).default;
     const articlesData = [];
@@ -171,22 +176,22 @@ router.post('/', async (req, res) => {
         telephone: client.telephone || '',
         fax: client.fax || '',
         adresse1: {
-          rue: client.adresse1?.rue || '',
-          ville: client.adresse1?.ville || '',
-          codePostal: client.adresse1?.codePostal || '',
-          pays: client.adresse1?.pays || 'France'
+          rue: (client.adresse1 && client.adresse1.rue) || '',
+          ville: (client.adresse1 && client.adresse1.ville) || '',
+          codePostal: (client.adresse1 && client.adresse1.codePostal) || '',
+          pays: (client.adresse1 && client.adresse1.pays) || 'France'
         },
         adresse2: {
-          rue: client.adresse2?.rue || '',
-          ville: client.adresse2?.ville || '',
-          codePostal: client.adresse2?.codePostal || '',
-          pays: client.adresse2?.pays || 'France'
+          rue: (client.adresse2 && client.adresse2.rue) || '',
+          ville: (client.adresse2 && client.adresse2.ville) || '',
+          codePostal: (client.adresse2 && client.adresse2.codePostal) || '',
+          pays: (client.adresse2 && client.adresse2.pays) || 'France'
         },
         memeAdresseLivraison: client.memeAdresseLivraison !== false
       }
     };
 
-    console.log('Commande avec client:', JSON.stringify(orderWithClient.client, null, 2));
+    console.log('✅ Commande créée avec client:', JSON.stringify(orderWithClient.client, null, 2));
 
     res.status(201).json({
       success: true,
@@ -256,23 +261,27 @@ router.get('/:id', async (req, res) => {
     // Récupérer les informations du client
     const Client = (await import('../models/Client.js')).default;
     
-    // Essayer de trouver le client par nom d'abord, puis par entreprise
-    let client = await Client.findOne({ nom: order.clientLivreFinal });
+    // Essayer de trouver le client par nom d'abord, puis par entreprise, puis par ID
+    let client = await Client.findById(order.clientLivreId).catch(() => null);
+    
+    if (!client) {
+      client = await Client.findOne({ nom: order.clientLivreFinal });
+    }
+    
     if (!client) {
       client = await Client.findOne({ entreprise: order.clientLivreFinal });
     }
     
-    console.log('Recherche client pour:', order.clientLivreFinal);
-    console.log('Client trouvé:', client ? 'Oui' : 'Non');
+    console.log('🔍 Recherche client pour:', order.clientLivreFinal);
+    console.log('🔍 Client trouvé:', client ? client.nom : 'Aucun');
+    
+    if (client) {
+      console.log('📍 Adresse1 du client:', client.adresse1);
+      console.log('📍 Adresse2 du client:', client.adresse2);
+    }
     
     let orderWithClient = order.toObject();
     if (client) {
-      console.log('Adresses du client:', {
-        adresse1: client.adresse1,
-        adresse2: client.adresse2,
-        memeAdresseLivraison: client.memeAdresseLivraison
-      });
-      
       orderWithClient.client = {
         nom: client.nom || '',
         entreprise: client.entreprise || '',
@@ -280,21 +289,21 @@ router.get('/:id', async (req, res) => {
         telephone: client.telephone || '',
         fax: client.fax || '',
         adresse1: {
-          rue: client.adresse1?.rue || '',
-          ville: client.adresse1?.ville || '',
-          codePostal: client.adresse1?.codePostal || '',
-          pays: client.adresse1?.pays || 'France'
+          rue: (client.adresse1 && client.adresse1.rue) || '',
+          ville: (client.adresse1 && client.adresse1.ville) || '',
+          codePostal: (client.adresse1 && client.adresse1.codePostal) || '',
+          pays: (client.adresse1 && client.adresse1.pays) || 'France'
         },
         adresse2: {
-          rue: client.adresse2?.rue || '',
-          ville: client.adresse2?.ville || '',
-          codePostal: client.adresse2?.codePostal || '',
-          pays: client.adresse2?.pays || 'France'
+          rue: (client.adresse2 && client.adresse2.rue) || '',
+          ville: (client.adresse2 && client.adresse2.ville) || '',
+          codePostal: (client.adresse2 && client.adresse2.codePostal) || '',
+          pays: (client.adresse2 && client.adresse2.pays) || 'France'
         },
         memeAdresseLivraison: client.memeAdresseLivraison !== false
       };
     } else {
-      console.log('Client non trouvé, utilisation des données par défaut');
+      console.log('❌ Client non trouvé, utilisation des données par défaut');
       orderWithClient.client = {
         nom: order.clientLivreFinal,
         entreprise: order.clientLivreFinal,
@@ -307,7 +316,7 @@ router.get('/:id', async (req, res) => {
       };
     }
     
-    console.log('Réponse finale client:', JSON.stringify(orderWithClient.client, null, 2));
+    console.log('✅ Réponse finale client:', JSON.stringify(orderWithClient.client, null, 2));
     
     res.json({
       success: true,

@@ -44,11 +44,19 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
     return new Date(dateString).toLocaleDateString('fr-FR');
   };
 
-  // Debug: afficher les données du client
-  console.log('OrderFormGenerator - Données reçues:', {
-    order: order,
-    client: order.client
-  });
+  // Debug: afficher les données du client avec plus de détails
+  console.log('🎯 OrderFormGenerator - Données complètes reçues:');
+  console.log('📋 Order:', order);
+  console.log('👤 Client:', order.client);
+  
+  if (order.client) {
+    console.log('🏠 Adresse1:', order.client.adresse1);
+    console.log('🚚 Adresse2:', order.client.adresse2);
+    console.log('📍 Même adresse livraison:', order.client.memeAdresseLivraison);
+  } else {
+    console.log('❌ Aucune donnée client trouvée');
+  }
+  
   const calculateTotals = () => {
     // Prix estimé par article (à remplacer par les vrais prix depuis la base Articles)
     const prixEstime = 50;
