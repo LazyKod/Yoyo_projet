@@ -160,10 +160,23 @@ router.post('/', async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
+    // Ajouter les informations du client à la réponse pour le bon de commande
+    const orderWithClient = {
+      ...savedOrder.toObject(),
+      client: {
+        nom: client.nom,
+        entreprise: client.entreprise,
+        email: client.email,
+        telephone: client.telephone,
+        adresse1: client.adresse1,
+        adresse2: client.adresse2,
+        memeAdresseLivraison: client.memeAdresseLivraison
+      }
+    };
     res.status(201).json({
       success: true,
       message: 'Commande créée avec succès',
-      data: savedOrder
+      data: orderWithClient
     });
 
   } catch (error) {
@@ -225,9 +238,25 @@ router.get('/:id', async (req, res) => {
       });
     }
 
+    // Récupérer les informations du client
+    const Client = (await import('../models/Client.js')).default;
+    const client = await Client.findOne({ nom: order.clientLivreFinal });
+    
+    let orderWithClient = order.toObject();
+    if (client) {
+      orderWithClient.client = {
+        nom: client.nom,
+        entreprise: client.entreprise,
+        email: client.email,
+        telephone: client.telephone,
+        adresse1: client.adresse1,
+        adresse2: client.adresse2,
+        memeAdresseLivraison: client.memeAdresseLivraison
+      };
+    }
     res.json({
       success: true,
-      data: order
+      data: orderWithClient
     });
   } catch (error) {
     res.status(500).json({
