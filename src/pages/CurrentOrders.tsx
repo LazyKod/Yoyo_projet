@@ -203,8 +203,7 @@ const CurrentOrders: React.FC<CurrentOrdersProps> = ({ onPageChange }) => {
   };
 
   const handleModifyOrder = (orderId: string) => {
-    // TODO: Implémenter la modification
-    setMessage({ type: 'error', text: 'Fonctionnalité de modification à implémenter' });
+    setMessage({ type: 'error', text: 'Fonctionnalité de modification en cours de développement' });
   };
 
   const handleGenerateOrderForm = (orderId: string) => {

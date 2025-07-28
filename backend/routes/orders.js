@@ -77,34 +77,69 @@ router.get('/', async (req, res) => {
 // Route pour créer une nouvelle commande multi-articles
 router.post('/', async (req, res) => {
   try {
-    const { clientLivreId, clientLivreFinal, articles, dateLivraison, typeCommande } = req.body;
+    const { clientId, articles, dateLivraison, typeCommande, notes } = req.body;
 
     // Validation des champs requis
-    if (!clientLivreId || !clientLivreFinal || !articles || !Array.isArray(articles) || articles.length === 0) {
+    if (!clientId || !articles || !Array.isArray(articles) || articles.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Client et articles requis'
+        message: 'Client ID et articles requis'
+      });
+    }
+
+    // Récupérer les informations du client
+    const Client = (await import('../models/Client.js')).default;
+    const client = await Client.findById(clientId);
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        message: 'Client non trouvé'
+      });
+    }
+
+    // Récupérer les informations des articles
+    const Article = (await import('../models/Article.js')).default;
+    const articlesData = [];
+    
+    for (const articleReq of articles) {
+      const article = await Article.findById(articleReq.articleId);
+      if (!article) {
+        return res.status(404).json({
+          success: false,
+          message: `Article non trouvé: ${articleReq.articleId}`
+        });
+      }
+      
+      // Vérifier le stock disponible
+      if (articleReq.quantite > (article.stock - article.stockReserve)) {
+        return res.status(400).json({
+          success: false,
+          message: `Stock insuffisant pour ${article.numeroArticle}`
+        });
+      }
+      
+      articlesData.push({
+        technologie: article.technologie,
+        familleProduit: article.familleProduit,
+        groupeCouverture: 'PF',
+        quantiteCommandee: articleReq.quantite,
+        quantiteALivrer: articleReq.quantite,
+        quantiteExpediee: 0,
+        quantiteEnPreparation: 0,
+        unite: article.unite,
+        confirmations: []
       });
     }
 
     // Créer la nouvelle commande
     const newOrder = new Order({
-      clientLivreId: Number(clientLivreId),
-      clientLivreFinal,
-      articles: articles.map(article => ({
-        technologie: article.technologie,
-        familleProduit: article.familleProduit,
-        groupeCouverture: article.groupeCouverture || 'PF',
-        quantiteCommandee: article.quantiteCommandee,
-        quantiteALivrer: article.quantiteCommandee,
-        quantiteExpediee: 0,
-        quantiteEnPreparation: 0,
-        unite: article.unite || 'PCE',
-        confirmations: []
-      })),
+      clientLivreId: Math.floor(Math.random() * 90000) + 10000, // Générer un ID client temporaire
+      clientLivreFinal: client.nom,
+      articles: articlesData,
       dateLivraison: new Date(dateLivraison),
       typeCommande: typeCommande || 'ZIG',
-      statut: 'brouillon'
+      statut: 'brouillon',
+      notes: notes || ''
     });
 
     const savedOrder = await newOrder.save();

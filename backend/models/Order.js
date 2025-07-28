@@ -95,6 +95,12 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: ['brouillon', 'confirmee', 'en_preparation', 'expediee', 'livree'],
     default: 'brouillon'
+  },
+  
+  // Notes optionnelles
+  notes: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true,

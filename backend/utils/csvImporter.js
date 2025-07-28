@@ -186,14 +186,26 @@ const createSampleOrders = async () => {
   const existing = await Order.countDocuments();
   if (existing > 0) return [];
 
+  // S'assurer que les clients et articles existent
+  const Client = (await import('../models/Client.js')).default;
+  const Article = (await import('../models/Article.js')).default;
+  
+  const clients = await Client.find().limit(2);
+  const articles = await Article.find().limit(3);
+  
+  if (clients.length === 0 || articles.length === 0) {
+    console.log('⚠️ Pas assez de clients ou d\'articles pour créer des commandes d\'exemple');
+    return [];
+  }
+
   const sampleOrders = [
     {
       clientLivreId: 32290,
-      clientLivreFinal: 'ARMOR PRINT SOLUTIONS S.A.S.',
+      clientLivreFinal: clients[0].nom,
       articles: [
         {
-          technologie: 'TON111',
-          familleProduit: 'APS BulkNiv2',
+          technologie: articles[0]?.technologie || 'TON111',
+          familleProduit: articles[0]?.familleProduit || 'APS BulkNiv2',
           groupeCouverture: 'PF',
           quantiteCommandee: 4,
           quantiteALivrer: 4,
@@ -203,8 +215,8 @@ const createSampleOrders = async () => {
           confirmations: []
         },
         {
-          technologie: 'TON121',
-          familleProduit: 'APS BulkNiv2',
+          technologie: articles[1]?.technologie || 'TON121',
+          familleProduit: articles[1]?.familleProduit || 'APS BulkNiv2',
           groupeCouverture: 'PF',
           quantiteCommandee: 2,
           quantiteALivrer: 2,
@@ -216,29 +228,19 @@ const createSampleOrders = async () => {
       ],
       typeCommande: 'ZIG',
       dateLivraison: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Dans 30 jours
-      statut: 'confirmee'
+      statut: 'confirmee',
+      notes: 'Commande d\'exemple confirmée'
     },
     {
       clientLivreId: 32291,
-      clientLivreFinal: 'TECH SOLUTIONS SARL',
+      clientLivreFinal: clients[1]?.nom || 'TECH SOLUTIONS SARL',
       articles: [
         {
-          technologie: 'TON120',
-          familleProduit: 'APS Finished Product',
+          technologie: articles[2]?.technologie || 'TON120',
+          familleProduit: articles[2]?.familleProduit || 'APS Finished Product',
           groupeCouverture: 'PF',
           quantiteCommandee: 3,
           quantiteALivrer: 3,
-          quantiteExpediee: 0,
-          quantiteEnPreparation: 0,
-          unite: 'PCE',
-          confirmations: []
-        },
-        {
-          technologie: 'INK201',
-          familleProduit: 'APS Cartridge',
-          groupeCouverture: 'PF',
-          quantiteCommandee: 5,
-          quantiteALivrer: 5,
           quantiteExpediee: 0,
           quantiteEnPreparation: 0,
           unite: 'PCE',
@@ -247,7 +249,8 @@ const createSampleOrders = async () => {
       ],
       typeCommande: 'ZIG',
       dateLivraison: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // Dans 15 jours
-      statut: 'brouillon'
+      statut: 'brouillon',
+      notes: 'Commande d\'exemple en attente'
     }
   ];
 

@@ -241,6 +241,8 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
         notes: formData.notes
       };
 
+      console.log('Données envoyées:', orderData); // Debug
+
       const response = await axios.post('/api/orders', orderData);
 
       if (response.data.success) {
@@ -257,7 +259,7 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
 
         // Redirection vers la gestion des commandes après 2 secondes
         setTimeout(() => {
-          onPageChange('orders');
+          onPageChange('current-orders');
         }, 2000);
       } else {
         setMessage({ type: 'error', text: response.data.message || 'Erreur lors de la création de la commande' });
@@ -266,7 +268,7 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
       console.error('Erreur lors de la création de la commande:', error);
       setMessage({ 
         type: 'error', 
-        text: error.response?.data?.message || 'Erreur lors de la création de la commande' 
+        text: error.response?.data?.message || 'Erreur lors de la création de la commande'
       });
     } finally {
       setLoading(false);
@@ -274,7 +276,7 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
   };
 
   const handleCancel = () => {
-    onPageChange('orders');
+    onPageChange('current-orders');
   };
 
   const filteredArticles = articles.filter(article =>
