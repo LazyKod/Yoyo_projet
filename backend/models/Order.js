@@ -61,7 +61,7 @@ const articleCommandeSchema = new mongoose.Schema({
 const orderSchema = new mongoose.Schema({
   // Informations client (compatible avec votre structure)
   clientLivreId: {
-    type: Number,
+    type: String,
     required: true
   },
   clientLivreFinal: {
