@@ -1,0 +1,11 @@
+id,email,password,nom,role,actif,derniere_connexion,date_creation
+1,admin@armor.com,password,Administrateur Système,admin,true,2024-12-15 09:30:00,2024-01-01
+2,manager@armor.com,password,Responsable Commandes,user,true,2024-12-14 16:45:00,2024-01-15
+3,commercial@armor.com,password,Commercial Senior,user,true,2024-12-13 14:20:00,2024-02-01
+4,logistique@armor.com,password,Responsable Logistique,user,true,2024-12-12 11:15:00,2024-02-15
+5,comptabilite@armor.com,password,Service Comptabilité,user,true,2024-12-11 08:30:00,2024-03-01
+6,production@armor.com,password,Chef de Production,user,true,2024-12-10 13:45:00,2024-03-15
+7,qualite@armor.com,password,Contrôle Qualité,user,true,2024-12-09 10:20:00,2024-04-01
+8,achat@armor.com,password,Service Achats,user,true,2024-12-08 15:30:00,2024-04-15
+9,vente@armor.com,password,Service Ventes,user,true,2024-12-07 12:10:00,2024-05-01
+10,support@armor.com,password,Support Client,user,false,2024-11-30 09:45:00,2024-05-15
