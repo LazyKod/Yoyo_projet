@@ -19,6 +19,32 @@ const parseDate = (dateStr) => {
   return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
 };
 
+// Nettoyer et recréer les données
+export const cleanAndRecreateData = async () => {
+  try {
+    console.log('🧹 Nettoyage de la base de données...');
+    
+    // Supprimer toutes les données existantes
+    await Promise.all([
+      Order.deleteMany({}),
+      User.deleteMany({}),
+      Client.deleteMany({}),
+      Article.deleteMany({})
+    ]);
+
+    console.log('✅ Base de données nettoyée');
+
+    // Recréer les données
+    await createDefaultUsers();
+    await createDefaultClientsAndArticles();
+    await createSampleOrders();
+
+    console.log('✅ Données recréées avec succès');
+  } catch (error) {
+    console.error('❌ Erreur lors du nettoyage:', error);
+  }
+};
+
 // Importation des commandes depuis Book2.csv
 export const importOrdersFromCSV = async () => {
   try {
@@ -31,22 +57,6 @@ export const importOrdersFromCSV = async () => {
 
     // Créer des clients et articles par défaut
     await createDefaultClientsAndArticles();
-
-    // Créer des clients et articles par défaut
-    await createDefaultClientsAndArticles();
-
-    const csvPath = path.join(__dirname, '../../data/Book2.csv');
-    if (!fs.existsSync(csvPath)) {
-      console.log('⚠️ Fichier Book2.csv non trouvé, création d\'exemples...');
-      return await createSampleOrders();
-    }
-
-    const csvContent = fs.readFileSync(csvPath, 'utf-8');
-    const lines = csvContent.split('\n').filter(line => line.trim());
-    if (lines.length < 2) {
-      console.log('⚠️ Fichier CSV vide, création d\'exemples...');
-      return await createSampleOrders();
-    }
 
     // Créer des commandes d'exemple avec le nouveau format
     return await createSampleOrders();
@@ -67,39 +77,7 @@ export const importUsersFromCSV = async () => {
       return await User.find().limit(10);
     }
 
-    const csvPath = path.join(__dirname, '../../data/Book3.csv');
-    if (!fs.existsSync(csvPath)) {
-      console.log('⚠️ Fichier Book3.csv non trouvé, création d\'utilisateurs par défaut...');
-      return await createDefaultUsers();
-    }
-
-    const csvContent = fs.readFileSync(csvPath, 'utf-8');
-    const lines = csvContent.split('\n').filter(line => line.trim());
-    if (lines.length < 2) {
-      console.log('⚠️ Fichier CSV vide, création d\'utilisateurs par défaut...');
-      return await createDefaultUsers();
-    }
-
-    const dataLines = lines.slice(1);
-    const result = [];
-
-    for (const line of dataLines) {
-      const columns = line.split(';').map(col => col.trim());
-      if (columns.length < 3) continue;
-
-      const user = new User({
-        email: columns[1] || 'admin@armor.com',
-        password: columns[2] || 'password',
-        nom: columns[1] === 'admin@armor.com' ? 'Administrateur' : 'Utilisateur',
-        role: columns[1] === 'admin@armor.com' ? 'admin' : 'user'
-      });
-
-      await user.save(); // 🔒 Le hook `pre('save')` hash le mot de passe
-      result.push(user);
-    }
-
-    console.log(`✅ ${result.length} utilisateurs importés depuis Book3.csv`);
-    return result;
+    return await createDefaultUsers();
   } catch (error) {
     console.error('❌ Erreur import utilisateurs :', error);
     const count = await User.countDocuments();
@@ -135,6 +113,17 @@ const createDefaultClientsAndArticles = async () => {
           codePostal: '75001',
           pays: 'France'
         }
+      },
+      {
+        nom: 'IMPRIMERIE MODERNE',
+        email: 'contact@imprimerie-moderne.fr',
+        telephone: '04 78 90 12 34',
+        adresse: {
+          rue: '25 Rue de l\'Industrie',
+          ville: 'Lyon',
+          codePostal: '69000',
+          pays: 'France'
+        }
       }
     ];
 
@@ -147,31 +136,54 @@ const createDefaultClientsAndArticles = async () => {
   if (articlesCount === 0) {
     const defaultArticles = [
       {
-        numeroArticle: 'TON111',
-        designation: 'Toner compatible HP CE390A',
+        numeroArticle: 'TON111-HP-CE390A',
+        designation: 'Toner compatible HP CE390A Noir',
         technologie: 'TON111',
         familleProduit: 'APS BulkNiv2',
         prixUnitaire: 45.50,
         unite: 'PCE',
-        stock: 100
+        stock: 100,
+        stockReserve: 10
       },
       {
-        numeroArticle: 'TON121',
-        designation: 'Toner compatible Canon CRG-728',
+        numeroArticle: 'TON121-CAN-CRG728',
+        designation: 'Toner compatible Canon CRG-728 Noir',
         technologie: 'TON121',
         familleProduit: 'APS BulkNiv2',
         prixUnitaire: 52.30,
         unite: 'PCE',
-        stock: 75
+        stock: 75,
+        stockReserve: 5
       },
       {
-        numeroArticle: 'TON120',
-        designation: 'Toner compatible Brother TN-2320',
+        numeroArticle: 'TON120-BRO-TN2320',
+        designation: 'Toner compatible Brother TN-2320 Noir',
         technologie: 'TON120',
         familleProduit: 'APS Finished Product',
         prixUnitaire: 38.90,
         unite: 'PCE',
-        stock: 150
+        stock: 150,
+        stockReserve: 15
+      },
+      {
+        numeroArticle: 'INK201-HP-302XL',
+        designation: 'Cartouche compatible HP 302XL Couleur',
+        technologie: 'INK201',
+        familleProduit: 'APS Finished Product',
+        prixUnitaire: 28.75,
+        unite: 'PCE',
+        stock: 80,
+        stockReserve: 8
+      },
+      {
+        numeroArticle: 'RIB301-ZEB-2300',
+        designation: 'Ruban compatible Zebra 2300 Wax',
+        technologie: 'RIB301',
+        familleProduit: 'APS Packaging Label',
+        prixUnitaire: 15.60,
+        unite: 'PCE',
+        stock: 60,
+        stockReserve: 6
       }
     ];
 
@@ -180,18 +192,14 @@ const createDefaultClientsAndArticles = async () => {
   }
 };
 
-
 // Commandes d'exemple
 const createSampleOrders = async () => {
   const existing = await Order.countDocuments();
   if (existing > 0) return [];
 
   // S'assurer que les clients et articles existent
-  const Client = (await import('../models/Client.js')).default;
-  const Article = (await import('../models/Article.js')).default;
-  
-  const clients = await Client.find().limit(2);
-  const articles = await Article.find().limit(3);
+  const clients = await Client.find().limit(3);
+  const articles = await Article.find().limit(5);
   
   if (clients.length === 0 || articles.length === 0) {
     console.log('⚠️ Pas assez de clients ou d\'articles pour créer des commandes d\'exemple');
@@ -251,6 +259,38 @@ const createSampleOrders = async () => {
       dateLivraison: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // Dans 15 jours
       statut: 'brouillon',
       notes: 'Commande d\'exemple en attente'
+    },
+    {
+      clientLivreId: 32292,
+      clientLivreFinal: clients[2]?.nom || 'IMPRIMERIE MODERNE',
+      articles: [
+        {
+          technologie: articles[3]?.technologie || 'INK201',
+          familleProduit: articles[3]?.familleProduit || 'APS Finished Product',
+          groupeCouverture: 'PF',
+          quantiteCommandee: 5,
+          quantiteALivrer: 5,
+          quantiteExpediee: 0,
+          quantiteEnPreparation: 0,
+          unite: 'PCE',
+          confirmations: []
+        },
+        {
+          technologie: articles[4]?.technologie || 'RIB301',
+          familleProduit: articles[4]?.familleProduit || 'APS Packaging Label',
+          groupeCouverture: 'PF',
+          quantiteCommandee: 10,
+          quantiteALivrer: 10,
+          quantiteExpediee: 0,
+          quantiteEnPreparation: 0,
+          unite: 'PCE',
+          confirmations: []
+        }
+      ],
+      typeCommande: 'STD',
+      dateLivraison: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000), // Dans 45 jours
+      statut: 'brouillon',
+      notes: 'Commande multi-articles'
     }
   ];
 
@@ -276,6 +316,12 @@ const createDefaultUsers = async () => {
       password: 'password',
       nom: 'Utilisateur',
       role: 'user'
+    },
+    {
+      email: 'manager@armor.com',
+      password: 'password',
+      nom: 'Responsable Commandes',
+      role: 'user'
     }
   ];
 
@@ -286,7 +332,6 @@ const createDefaultUsers = async () => {
     await user.save();
     result.push(user);
   }
-
 
   console.log(`✅ ${result.length} utilisateurs par défaut créés`);
   return result;

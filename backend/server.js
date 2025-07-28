@@ -9,6 +9,7 @@ import orderRoutes from './routes/orders.js';
 import clientRoutes from './routes/clients.js';
 import articleRoutes from './routes/articles.js';
 import { importOrdersFromCSV, importUsersFromCSV } from './utils/csvImporter.js';
+import { cleanAndRecreateData } from './utils/csvImporter.js';
 
 dotenv.config();
 
@@ -28,10 +29,18 @@ const initializeDatabase = async () => {
     // Connecter à MongoDB
     await connectDB();
     
-    // Importer les données depuis les fichiers CSV
-    console.log('📊 Importation des données depuis les fichiers CSV...');
-    await importUsersFromCSV();
-    await importOrdersFromCSV();
+    // Vérifier si on doit nettoyer et recréer les données
+    const shouldClean = process.env.CLEAN_DB === 'true';
+    
+    if (shouldClean) {
+      console.log('🧹 Nettoyage et recréation des données...');
+      await cleanAndRecreateData();
+    } else {
+      // Importer les données depuis les fichiers CSV
+      console.log('📊 Importation des données depuis les fichiers CSV...');
+      await importUsersFromCSV();
+      await importOrdersFromCSV();
+    }
     
     console.log('✅ Base de données initialisée avec succès');
   } catch (error) {

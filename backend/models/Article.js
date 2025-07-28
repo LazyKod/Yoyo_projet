@@ -66,7 +66,6 @@ articleSchema.virtual('stockDisponible').get(function() {
 });
 
 // Index pour améliorer les performances
-articleSchema.index({ numeroArticle: 1 });
 articleSchema.index({ technologie: 1 });
 articleSchema.index({ familleProduit: 1 });
 

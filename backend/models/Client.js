@@ -34,6 +34,5 @@ const clientSchema = new mongoose.Schema({
 
 // Index pour améliorer les performances
 clientSchema.index({ nom: 1 });
-clientSchema.index({ email: 1 });
 
 export default mongoose.model('Client', clientSchema);

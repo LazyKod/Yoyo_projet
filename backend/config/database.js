@@ -5,14 +5,8 @@ dotenv.config();
 
 const connectDB = async () => {
   try {
-    // Options de connexion recommandées
-    const options = {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    };
-
     // Connexion à MongoDB
-    const conn = await mongoose.connect(process.env.MONGODB_URI, options);
+    const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/armor_orders');
 
     console.log(`✅ MongoDB connecté: ${conn.connection.host}`);
     console.log(`📊 Base de données: ${conn.connection.name}`);

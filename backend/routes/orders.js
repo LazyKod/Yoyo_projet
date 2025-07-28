@@ -35,24 +35,39 @@ router.get('/', async (req, res) => {
     const total = await Order.countDocuments(filter);
 
     // Transformer les données pour compatibilité avec le frontend
-    const transformedOrders = orders.map(order => ({
-      ...order,
-      id: order._id.toString(),
-      poste: order.clientLivreId.toString(),
-      // Pour compatibilité, on prend le premier article comme référence
-      numeroArticle: order.articles[0]?.technologie || '',
-      designation: order.articles[0]?.familleProduit || '',
-      technologie: order.articles[0]?.technologie || '',
-      familleProduit: order.articles[0]?.familleProduit || '',
-      quantiteCommandee: order.articles.reduce((sum, art) => sum + art.quantiteCommandee, 0),
-      quantiteExpediee: order.articles.reduce((sum, art) => sum + art.quantiteExpediee, 0),
-      quantiteALivrer: order.articles.reduce((sum, art) => sum + art.quantiteALivrer, 0),
-      quantiteEnPreparation: order.articles.reduce((sum, art) => sum + art.quantiteEnPreparation, 0),
-      clientFinal: order.clientLivreFinal,
-      dateConfirmation: order.statut !== 'brouillon' ? order.updatedAt : null,
-      typCommande: order.typeCommande,
-      unite: order.articles[0]?.unite || 'PCE'
-    }));
+    const transformedOrders = orders.map(order => {
+      // Vérifications de sécurité pour éviter les erreurs
+      const safeOrder = {
+        ...order,
+        _id: order._id || '',
+        clientLivreId: order.clientLivreId || 0,
+        clientLivreFinal: order.clientLivreFinal || 'Client inconnu',
+        articles: Array.isArray(order.articles) ? order.articles : [],
+        dateCreation: order.dateCreation || order.createdAt || new Date(),
+        dateLivraison: order.dateLivraison || new Date(),
+        typeCommande: order.typeCommande || 'ZIG',
+        statut: order.statut || 'brouillon'
+      };
+
+      return {
+        ...safeOrder,
+        id: safeOrder._id.toString(),
+        poste: safeOrder.clientLivreId.toString(),
+        // Pour compatibilité, on prend le premier article comme référence
+        numeroArticle: safeOrder.articles[0]?.technologie || '',
+        designation: safeOrder.articles[0]?.familleProduit || '',
+        technologie: safeOrder.articles[0]?.technologie || '',
+        familleProduit: safeOrder.articles[0]?.familleProduit || '',
+        quantiteCommandee: safeOrder.articles.reduce((sum, art) => sum + (art.quantiteCommandee || 0), 0),
+        quantiteExpediee: safeOrder.articles.reduce((sum, art) => sum + (art.quantiteExpediee || 0), 0),
+        quantiteALivrer: safeOrder.articles.reduce((sum, art) => sum + (art.quantiteALivrer || 0), 0),
+        quantiteEnPreparation: safeOrder.articles.reduce((sum, art) => sum + (art.quantiteEnPreparation || 0), 0),
+        clientFinal: safeOrder.clientLivreFinal,
+        dateConfirmation: safeOrder.statut !== 'brouillon' ? safeOrder.updatedAt : null,
+        typCommande: safeOrder.typeCommande,
+        unite: safeOrder.articles[0]?.unite || 'PCE'
+      };
+    });
 
     res.json({
       success: true,
@@ -111,7 +126,8 @@ router.post('/', async (req, res) => {
       }
       
       // Vérifier le stock disponible
-      if (articleReq.quantite > (article.stock - article.stockReserve)) {
+      const stockDisponible = (article.stock || 0) - (article.stockReserve || 0);
+      if (articleReq.quantite > stockDisponible) {
         return res.status(400).json({
           success: false,
           message: `Stock insuffisant pour ${article.numeroArticle}`
