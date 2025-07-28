@@ -385,19 +385,18 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
             text: editOrderId ? 'Commande modifiée avec succès !' : 'Commande créée avec succès !' 
           });
         }
-        setMessage({ 
-          type: 'success', 
-          text: editOrderId ? 'Commande modifiée avec succès !' : 'Commande créée avec succès !' 
-        });
         
+        // Réinitialiser le formulaire seulement en mode création
+        if (!editOrderId) {
+          setFormData({
+            clientId: '',
+            articles: [],
             dateLivraison: '',
             typeCommande: 'ZIG',
             notes: '',
             confirmerDirectement: false
           });
         }
-
-            notes: '',
       } else {
         setMessage({ 
           type: 'error', 
