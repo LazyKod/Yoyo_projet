@@ -322,14 +322,14 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
                   Tableau de bord
                 </button>
                 <button
-                  onClick={() => handleTabChange('orders')}
+                  onClick={() => handleTabChange('current-orders')}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === 'orders'
+                    activeTab === 'current-orders'
                       ? 'bg-white/20 text-white'
                       : 'text-slate-300 hover:text-white hover:bg-white/10'
                   }`}
                 >
-                  Gestion de commandes
+                  Commandes actuelles
                 </button>
                 <button
                   onClick={() => handleTabChange('add-order')}

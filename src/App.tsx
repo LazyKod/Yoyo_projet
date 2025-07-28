@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
-import OrderManagement from './pages/OrderManagement';
+import CurrentOrders from './pages/CurrentOrders';
 import AddOrder from './pages/AddOrder';
-import EditOrder from './pages/EditOrder';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 function AppContent() {
@@ -32,12 +31,10 @@ function AppContent() {
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard onPageChange={handlePageChange} />;
-      case 'orders':
-        return <OrderManagement onPageChange={handlePageChange} />;
+      case 'current-orders':
+        return <CurrentOrders onPageChange={handlePageChange} />;
       case 'add-order':
         return <AddOrder onPageChange={handlePageChange} />;
-      case 'edit-order':
-        return <EditOrder onPageChange={handlePageChange} />;
       default:
         return <Dashboard onPageChange={handlePageChange} />;
     }
