@@ -1,7 +1,5 @@
 import express from 'express';
 import Order from '../models/Order.js';
-import Client from '../models/Client.js';
-import Article from '../models/Article.js';
 
 const router = express.Router();
 
@@ -15,8 +13,11 @@ router.get('/', async (req, res) => {
     
     if (search) {
       filter.$or = [
-        { numeroCommande: { $regex: search, $options: 'i' } }
-      ];
+        { clientLivreFinal: { $regex: search, $options: 'i' } },
+        { clientLivreId: isNaN(search) ? undefined : Number(search) },
+        { 'articles.technologie': { $regex: search, $options: 'i' } },
+        { 'articles.familleProduit': { $regex: search, $options: 'i' } }
+      ].filter(condition => condition.clientLivreId !== undefined || condition.clientLivreFinal || condition['articles.technologie'] || condition['articles.familleProduit']);
     }
     
     if (status === 'confirmed') {
@@ -26,17 +27,36 @@ router.get('/', async (req, res) => {
     }
 
     const orders = await Order.find(filter)
-      .populate('clientId', 'nom email')
-      .sort({ createdAt: -1 })
+      .sort({ dateCreation: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .lean();
 
     const total = await Order.countDocuments(filter);
 
+    // Transformer les données pour compatibilité avec le frontend
+    const transformedOrders = orders.map(order => ({
+      ...order,
+      id: order._id.toString(),
+      poste: order.clientLivreId.toString(),
+      // Pour compatibilité, on prend le premier article comme référence
+      numeroArticle: order.articles[0]?.technologie || '',
+      designation: order.articles[0]?.familleProduit || '',
+      technologie: order.articles[0]?.technologie || '',
+      familleProduit: order.articles[0]?.familleProduit || '',
+      quantiteCommandee: order.articles.reduce((sum, art) => sum + art.quantiteCommandee, 0),
+      quantiteExpediee: order.articles.reduce((sum, art) => sum + art.quantiteExpediee, 0),
+      quantiteALivrer: order.articles.reduce((sum, art) => sum + art.quantiteALivrer, 0),
+      quantiteEnPreparation: order.articles.reduce((sum, art) => sum + art.quantiteEnPreparation, 0),
+      clientFinal: order.clientLivreFinal,
+      dateConfirmation: order.statut !== 'brouillon' ? order.updatedAt : null,
+      typCommande: order.typeCommande,
+      unite: order.articles[0]?.unite || 'PCE'
+    }));
+
     res.json({
       success: true,
-      data: orders,
+      data: transformedOrders,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -54,75 +74,40 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Route pour créer une nouvelle commande
+// Route pour créer une nouvelle commande multi-articles
 router.post('/', async (req, res) => {
   try {
-    const { clientId, articles, dateLivraison, typeCommande, notes } = req.body;
+    const { clientLivreId, clientLivreFinal, articles, dateLivraison, typeCommande } = req.body;
 
     // Validation des champs requis
-    if (!clientId || !articles || !Array.isArray(articles) || articles.length === 0) {
+    if (!clientLivreId || !clientLivreFinal || !articles || !Array.isArray(articles) || articles.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Client et articles requis'
       });
     }
 
-    // Vérifier que le client existe
-    const client = await Client.findById(clientId);
-    if (!client) {
-      return res.status(400).json({
-        success: false,
-        message: 'Client non trouvé'
-      });
-    }
-
-    // Vérifier les articles et les stocks
-    const articlesData = [];
-    for (const articleCmd of articles) {
-      const article = await Article.findById(articleCmd.articleId);
-      if (!article) {
-        return res.status(400).json({
-          success: false,
-          message: `Article ${articleCmd.articleId} non trouvé`
-        });
-      }
-
-      if (article.stockDisponible < articleCmd.quantite) {
-        return res.status(400).json({
-          success: false,
-          message: `Stock insuffisant pour ${article.numeroArticle}`
-        });
-      }
-
-      articlesData.push({
-        articleId: article._id,
-        numeroArticle: article.numeroArticle,
-        designation: article.designation,
-        quantite: articleCmd.quantite,
-        prixUnitaire: article.prixUnitaire,
-        unite: article.unite
-      });
-
-      // Réserver le stock
-      article.stockReserve += articleCmd.quantite;
-      await article.save();
-    }
-
-    // Générer le numéro de commande
-    const numeroCommande = await Order.genererNumeroCommande();
-
     // Créer la nouvelle commande
     const newOrder = new Order({
-      numeroCommande,
-      clientId,
-      articles: articlesData,
+      clientLivreId: Number(clientLivreId),
+      clientLivreFinal,
+      articles: articles.map(article => ({
+        technologie: article.technologie,
+        familleProduit: article.familleProduit,
+        groupeCouverture: article.groupeCouverture || 'PF',
+        quantiteCommandee: article.quantiteCommandee,
+        quantiteALivrer: article.quantiteCommandee,
+        quantiteExpediee: 0,
+        quantiteEnPreparation: 0,
+        unite: article.unite || 'PCE',
+        confirmations: []
+      })),
       dateLivraison: new Date(dateLivraison),
       typeCommande: typeCommande || 'ZIG',
-      notes
+      statut: 'brouillon'
     });
 
     const savedOrder = await newOrder.save();
-    await savedOrder.populate('clientId', 'nom email');
 
     res.status(201).json({
       success: true,
@@ -160,7 +145,6 @@ router.put('/:id/confirm', async (req, res) => {
     }
 
     await order.confirmerCommande();
-    await order.populate('clientId', 'nom email');
 
     res.json({
       success: true,
@@ -181,7 +165,7 @@ router.put('/:id/confirm', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const order = await Order.findById(id).populate('clientId', 'nom email');
+    const order = await Order.findById(id);
 
     if (!order) {
       return res.status(404).json({
@@ -202,6 +186,57 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Route pour mettre à jour une commande
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const order = await Order.findById(id);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Commande non trouvée'
+      });
+    }
+
+    // Mettre à jour les champs autorisés
+    if (updateData.clientLivreFinal) order.clientLivreFinal = updateData.clientLivreFinal;
+    if (updateData.dateLivraison) order.dateLivraison = new Date(updateData.dateLivraison);
+    if (updateData.typeCommande) order.typeCommande = updateData.typeCommande;
+    
+    // Mettre à jour les articles si fournis
+    if (updateData.articles && Array.isArray(updateData.articles)) {
+      order.articles = updateData.articles.map(article => ({
+        technologie: article.technologie,
+        familleProduit: article.familleProduit,
+        groupeCouverture: article.groupeCouverture || 'PF',
+        quantiteCommandee: article.quantiteCommandee,
+        quantiteALivrer: article.quantiteALivrer || article.quantiteCommandee,
+        quantiteExpediee: article.quantiteExpediee || 0,
+        quantiteEnPreparation: article.quantiteEnPreparation || 0,
+        unite: article.unite || 'PCE',
+        confirmations: article.confirmations || []
+      }));
+    }
+
+    const updatedOrder = await order.save();
+
+    res.json({
+      success: true,
+      message: 'Commande modifiée avec succès',
+      data: updatedOrder
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la modification de la commande:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur lors de la modification'
+    });
+  }
+});
+
 // Route pour supprimer une commande
 router.delete('/:id', async (req, res) => {
   try {
@@ -213,15 +248,6 @@ router.delete('/:id', async (req, res) => {
         success: false,
         message: 'Commande non trouvée'
       });
-    }
-
-    // Libérer les stocks réservés
-    for (const articleCmd of order.articles) {
-      const article = await Article.findById(articleCmd.articleId);
-      if (article) {
-        article.stockReserve = Math.max(0, article.stockReserve - articleCmd.quantite);
-        await article.save();
-      }
     }
 
     await Order.findByIdAndDelete(id);

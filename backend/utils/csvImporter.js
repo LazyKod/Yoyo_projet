@@ -182,53 +182,63 @@ const createSampleOrders = async () => {
   const existing = await Order.countDocuments();
   if (existing > 0) return [];
 
-  // Récupérer les clients et articles par défaut
-  const clients = await Client.find().limit(2);
-  const articles = await Article.find().limit(3);
-
-  if (clients.length === 0 || articles.length === 0) {
-    console.log('⚠️ Pas de clients ou articles pour créer des commandes d\'exemple');
-    return [];
-  }
-
   const sampleOrders = [
     {
-      numeroCommande: await Order.genererNumeroCommande(),
-      clientId: clients[0]._id,
+      clientLivreId: 32290,
+      clientLivreFinal: 'ARMOR PRINT SOLUTIONS S.A.S.',
       articles: [
         {
-          articleId: articles[0]._id,
-          numeroArticle: articles[0].numeroArticle,
-          designation: articles[0].designation,
-          quantite: 4,
-          prixUnitaire: articles[0].prixUnitaire,
-          unite: articles[0].unite
+          technologie: 'TON111',
+          familleProduit: 'APS BulkNiv2',
+          groupeCouverture: 'PF',
+          quantiteCommandee: 4,
+          quantiteALivrer: 4,
+          quantiteExpediee: 0,
+          quantiteEnPreparation: 0,
+          unite: 'PCE',
+          confirmations: []
+        },
+        {
+          technologie: 'TON121',
+          familleProduit: 'APS BulkNiv2',
+          groupeCouverture: 'PF',
+          quantiteCommandee: 2,
+          quantiteALivrer: 2,
+          quantiteExpediee: 0,
+          quantiteEnPreparation: 0,
+          unite: 'PCE',
+          confirmations: []
         }
       ],
       typeCommande: 'ZIG',
       dateLivraison: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Dans 30 jours
-      statut: 'confirmee',
-      dateConfirmation: new Date()
+      statut: 'confirmee'
     },
     {
-      numeroCommande: await Order.genererNumeroCommande(),
-      clientId: clients[1]._id,
+      clientLivreId: 32291,
+      clientLivreFinal: 'TECH SOLUTIONS SARL',
       articles: [
         {
-          articleId: articles[1]._id,
-          numeroArticle: articles[1].numeroArticle,
-          designation: articles[1].designation,
-          quantite: 2,
-          prixUnitaire: articles[1].prixUnitaire,
-          unite: articles[1].unite
+          technologie: 'TON120',
+          familleProduit: 'APS Finished Product',
+          groupeCouverture: 'PF',
+          quantiteCommandee: 3,
+          quantiteALivrer: 3,
+          quantiteExpediee: 0,
+          quantiteEnPreparation: 0,
+          unite: 'PCE',
+          confirmations: []
         },
         {
-          articleId: articles[2]._id,
-          numeroArticle: articles[2].numeroArticle,
-          designation: articles[2].designation,
-          quantite: 3,
-          prixUnitaire: articles[2].prixUnitaire,
-          unite: articles[2].unite
+          technologie: 'INK201',
+          familleProduit: 'APS Cartridge',
+          groupeCouverture: 'PF',
+          quantiteCommandee: 5,
+          quantiteALivrer: 5,
+          quantiteExpediee: 0,
+          quantiteEnPreparation: 0,
+          unite: 'PCE',
+          confirmations: []
         }
       ],
       typeCommande: 'ZIG',
