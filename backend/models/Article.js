@@ -19,7 +19,8 @@ const articleSchema = new mongoose.Schema({
   },
   familleProduit: {
     type: String,
-    required: true,
+    required: false,
+    default: 'APS BulkNiv2',
     enum: [
       'APS BulkNiv2',
       'APS Finished Product',
@@ -38,9 +39,9 @@ const articleSchema = new mongoose.Schema({
   },
   unite: {
     type: String,
-    required: true,
+    required: false,
+    default: 'PCE',
     enum: ['PCE', 'KG', 'L', 'M'],
-    default: 'PCE'
   },
   stock: {
     type: Number,

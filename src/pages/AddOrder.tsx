@@ -87,6 +87,10 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+  // Déterminer le titre et l'onglet actif basé sur editOrderId
+  const isEditMode = editOrderId !== null;
+  const currentTab = isEditMode ? 'edit-order' : 'add-order';
+
   // Charger la commande à modifier si editOrderId est fourni
   useEffect(() => {
     const loadOrderForEdit = async () => {
@@ -114,21 +118,38 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
             setFormData(prev => ({ ...prev, clientId: matchingClient._id }));
           }
           
-          // Reconstruire les articles (simulation basée sur les données disponibles)
-          const reconstructedArticles: ArticleCommande[] = order.articles.map((orderArticle: any, index: number) => {
-            // Trouver l'article correspondant dans la liste des articles
-            const matchingArticle = articles.find(a => a.technologie === orderArticle.technologie);
+          // Reconstruire les articles avec plus de sécurité
+          const reconstructedArticles: ArticleCommande[] = [];
+          
+          for (const orderArticle of order.articles) {
+            const matchingArticle = articles.find(a => 
+              a.technologie === orderArticle.technologie || 
+              a.numeroArticle === orderArticle.technologie
+            );
             
-            return {
-              articleId: matchingArticle?._id || `temp-${index}`,
-              numeroArticle: matchingArticle?.numeroArticle || orderArticle.technologie,
-              designation: matchingArticle?.designation || orderArticle.familleProduit,
-              quantite: orderArticle.quantiteCommandee || 1,
-              prixUnitaire: matchingArticle?.prixUnitaire || 50,
-              unite: orderArticle.unite || 'PCE',
-              stockDisponible: matchingArticle?.stockDisponible || 100
-            };
-          });
+            if (matchingArticle) {
+              reconstructedArticles.push({
+                articleId: matchingArticle._id,
+                numeroArticle: matchingArticle.numeroArticle,
+                designation: matchingArticle.designation,
+                quantite: orderArticle.quantiteCommandee || 1,
+                prixUnitaire: matchingArticle.prixUnitaire,
+                unite: orderArticle.unite || matchingArticle.unite,
+                stockDisponible: matchingArticle.stockDisponible
+              });
+            } else {
+              // Créer un article temporaire si pas trouvé
+              reconstructedArticles.push({
+                articleId: `temp-${reconstructedArticles.length}`,
+                numeroArticle: orderArticle.technologie,
+                designation: orderArticle.familleProduit || 'Article non trouvé',
+                quantite: orderArticle.quantiteCommandee || 1,
+                prixUnitaire: 50, // Prix par défaut
+                unite: orderArticle.unite || 'PCE',
+                stockDisponible: 100 // Stock par défaut
+              });
+            }
+          }
           
           setFormData(prev => ({ ...prev, articles: reconstructedArticles }));
         }
@@ -178,8 +199,11 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
   }, []);
 
   const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    onPageChange(tab);
+    // Ne pas permettre le changement d'onglet en mode édition
+    if (!isEditMode) {
+      setActiveTab(tab);
+      onPageChange(tab);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -264,9 +288,9 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
       newErrors.articles = 'Veuillez ajouter au moins un article';
     }
 
-    // Vérifier les stocks
+    // Vérifier les stocks pour les vrais articles (pas les temporaires)
     for (const article of formData.articles) {
-      if (article.quantite > article.stockDisponible) {
+      if (!article.articleId.startsWith('temp-') && article.quantite > article.stockDisponible) {
         newErrors.articles = `Stock insuffisant pour ${article.numeroArticle}`;
         break;
       }
@@ -298,9 +322,18 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
     setLoading(true);
 
     try {
+      // Filtrer les articles temporaires pour la modification
+      const validArticles = formData.articles.filter(article => !article.articleId.startsWith('temp-'));
+      
+      if (editOrderId && validArticles.length === 0) {
+        setMessage({ type: 'error', text: 'Aucun article valide trouvé pour la modification' });
+        setLoading(false);
+        return;
+      }
+      
       const orderData = {
         clientId: formData.clientId,
-        articles: formData.articles.map(article => ({
+        articles: (editOrderId ? validArticles : formData.articles).map(article => ({
           articleId: article.articleId,
           quantite: article.quantite
         })),
@@ -309,14 +342,12 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
         notes: formData.notes
       };
 
-      console.log('Données envoyées:', orderData); // Debug
+      console.log('Données envoyées:', orderData);
 
       let response;
       if (editOrderId) {
-        // Mode modification
         response = await axios.put(`/api/orders/${editOrderId}`, orderData);
       } else {
-        // Mode création
         response = await axios.post('/api/orders', orderData);
       }
 
@@ -415,6 +446,7 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
                       ? 'bg-white/20 text-white'
                       : 'text-slate-300 hover:text-white hover:bg-white/10'
                   }`}
+                  disabled={isEditMode}
                 >
                   Tableau de bord
                 </button>
@@ -425,18 +457,20 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
                       ? 'bg-white/20 text-white'
                       : 'text-slate-300 hover:text-white hover:bg-white/10'
                   }`}
+                  disabled={isEditMode}
                 >
                   Commandes actuelles
                 </button>
                 <button
                   onClick={() => handleTabChange('add-order')}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === 'add-order'
+                    currentTab === 'add-order' || currentTab === 'edit-order'
                       ? 'bg-white/20 text-white'
                       : 'text-slate-300 hover:text-white hover:bg-white/10'
                   }`}
+                  disabled={isEditMode}
                 >
-                  Ajouter une commande
+                  {isEditMode ? 'Modifier commande' : 'Ajouter une commande'}
                 </button>
               </nav>
             </div>
@@ -472,10 +506,10 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
             </button>
             <div>
               <h1 className="text-3xl font-bold text-slate-800 mb-2">
-                {editOrderId ? 'Modifier la commande' : 'Ajouter une commande'}
+                {isEditMode ? 'Modifier la commande' : 'Ajouter une commande'}
               </h1>
               <p className="text-slate-600">
-                {editOrderId ? 'Modifiez les détails de la commande' : 'Créez une nouvelle commande multi-articles'}
+                {isEditMode ? 'Modifiez les détails de la commande' : 'Créez une nouvelle commande multi-articles'}
               </p>
             </div>
           </div>
