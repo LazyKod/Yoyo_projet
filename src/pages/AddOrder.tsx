@@ -453,7 +453,7 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
                 <button
                   onClick={() => handleTabChange('current-orders')}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === 'current-orders'
+                    activeTab === 'current-orders' || isEditMode
                       ? 'bg-white/20 text-white'
                       : 'text-slate-300 hover:text-white hover:bg-white/10'
                   }`}
@@ -464,7 +464,7 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
                 <button
                   onClick={() => handleTabChange('add-order')}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    currentTab === 'add-order' || currentTab === 'edit-order'
+                    currentTab === 'add-order' && !isEditMode
                       ? 'bg-white/20 text-white'
                       : 'text-slate-300 hover:text-white hover:bg-white/10'
                   }`}
