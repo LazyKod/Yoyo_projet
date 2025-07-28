@@ -6,6 +6,8 @@ import Order from '../models/Order.js';
 import User from '../models/User.js';
 import Client from '../models/Client.js';
 import Article from '../models/Article.js';
+import Client from '../models/Client.js';
+import Article from '../models/Article.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,6 +30,9 @@ export const importOrdersFromCSV = async () => {
       console.log(`✅ ${existingOrdersCount} commandes déjà présentes en base`);
       return await Order.find().limit(10);
     }
+
+    // Créer des clients et articles par défaut
+    await createDefaultClientsAndArticles();
 
     // Créer des clients et articles par défaut
     await createDefaultClientsAndArticles();
@@ -102,6 +107,78 @@ export const importUsersFromCSV = async () => {
     const count = await User.countDocuments();
     if (count === 0) return await createDefaultUsers();
     return [];
+  }
+};
+
+// Créer des clients et articles par défaut
+const createDefaultClientsAndArticles = async () => {
+  // Créer des clients par défaut
+  const clientsCount = await Client.countDocuments();
+  if (clientsCount === 0) {
+    const defaultClients = [
+      {
+        nom: 'ARMOR PRINT SOLUTIONS S.A.S.',
+        email: 'contact@armor.com',
+        telephone: '02 96 54 71 00',
+        adresse: {
+          rue: 'Zone Industrielle de Kergaradec',
+          ville: 'La Chapelle-sur-Erdre',
+          codePostal: '44240',
+          pays: 'France'
+        }
+      },
+      {
+        nom: 'TECH SOLUTIONS SARL',
+        email: 'info@techsolutions.fr',
+        telephone: '01 23 45 67 89',
+        adresse: {
+          rue: '15 Avenue des Technologies',
+          ville: 'Paris',
+          codePostal: '75001',
+          pays: 'France'
+        }
+      }
+    ];
+
+    await Client.insertMany(defaultClients);
+    console.log(`✅ ${defaultClients.length} clients par défaut créés`);
+  }
+
+  // Créer des articles par défaut
+  const articlesCount = await Article.countDocuments();
+  if (articlesCount === 0) {
+    const defaultArticles = [
+      {
+        numeroArticle: 'TON111',
+        designation: 'Toner compatible HP CE390A',
+        technologie: 'TON111',
+        familleProduit: 'APS BulkNiv2',
+        prixUnitaire: 45.50,
+        unite: 'PCE',
+        stock: 100
+      },
+      {
+        numeroArticle: 'TON121',
+        designation: 'Toner compatible Canon CRG-728',
+        technologie: 'TON121',
+        familleProduit: 'APS BulkNiv2',
+        prixUnitaire: 52.30,
+        unite: 'PCE',
+        stock: 75
+      },
+      {
+        numeroArticle: 'TON120',
+        designation: 'Toner compatible Brother TN-2320',
+        technologie: 'TON120',
+        familleProduit: 'APS Finished Product',
+        prixUnitaire: 38.90,
+        unite: 'PCE',
+        stock: 150
+      }
+    ];
+
+    await Article.insertMany(defaultArticles);
+    console.log(`✅ ${defaultArticles.length} articles par défaut créés`);
   }
 };
 

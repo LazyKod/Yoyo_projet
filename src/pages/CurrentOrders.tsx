@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
+import OrderFormGenerator from '../components/OrderFormGenerator';
 
 interface Order {
   _id: string;
@@ -52,6 +53,7 @@ const CurrentOrders: React.FC<CurrentOrdersProps> = ({ onPageChange }) => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [confirmingOrder, setConfirmingOrder] = useState<string | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<string | null>(null);
+  const [showOrderForm, setShowOrderForm] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Charger les commandes
@@ -206,8 +208,7 @@ const CurrentOrders: React.FC<CurrentOrdersProps> = ({ onPageChange }) => {
   };
 
   const handleGenerateOrderForm = (orderId: string) => {
-    // TODO: Implémenter la génération de bon de commande
-    setMessage({ type: 'error', text: 'Génération de bon de commande à implémenter' });
+    setShowOrderForm(true);
   };
 
   if (loading) {
@@ -544,6 +545,14 @@ const CurrentOrders: React.FC<CurrentOrdersProps> = ({ onPageChange }) => {
           </div>
         </div>
       </main>
+
+      {/* Modal de génération de bon de commande */}
+      {showOrderForm && selectedOrder && (
+        <OrderFormGenerator
+          order={selectedOrder}
+          onClose={() => setShowOrderForm(false)}
+        />
+      )}
     </div>
   );
 };
