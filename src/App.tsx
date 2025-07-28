@@ -3,6 +3,7 @@ import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import CurrentOrders from './pages/CurrentOrders';
 import AddOrder from './pages/AddOrder';
+import ClientsArticles from './pages/ClientsArticles';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 function AppContent() {
@@ -41,6 +42,8 @@ function AppContent() {
         return <CurrentOrders onPageChange={handlePageChange} />;
       case 'add-order':
         return <AddOrder onPageChange={handlePageChange} editOrderId={null} />;
+      case 'clients-articles':
+        return <ClientsArticles onPageChange={handlePageChange} />;
       default:
         return <Dashboard onPageChange={handlePageChange} />;
     }

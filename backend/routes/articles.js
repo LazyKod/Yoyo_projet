@@ -92,4 +92,106 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Route pour récupérer un article spécifique
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const article = await Article.findById(id);
+
+    if (!article) {
+      return res.status(404).json({
+        success: false,
+        message: 'Article non trouvé'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...article.toObject(),
+        stockDisponible: article.stock - article.stockReserve
+      }
+    });
+  } catch (error) {
+    console.error('Erreur lors de la récupération de l\'article:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération de l\'article'
+    });
+  }
+});
+
+// Route pour mettre à jour un article
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const articleData = req.body;
+
+    const updatedArticle = await Article.findByIdAndUpdate(
+      id,
+      articleData,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedArticle) {
+      return res.status(404).json({
+        success: false,
+        message: 'Article non trouvé'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Article mis à jour avec succès',
+      data: updatedArticle
+    });
+
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Un article avec ce numéro existe déjà'
+      });
+    }
+    
+    console.error('Erreur lors de la mise à jour de l\'article:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur lors de la mise à jour de l\'article'
+    });
+  }
+});
+
+// Route pour supprimer un article (soft delete)
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const updatedArticle = await Article.findByIdAndUpdate(
+      id,
+      { actif: false },
+      { new: true }
+    );
+
+    if (!updatedArticle) {
+      return res.status(404).json({
+        success: false,
+        message: 'Article non trouvé'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Article supprimé avec succès'
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la suppression de l\'article:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur lors de la suppression de l\'article'
+    });
+  }
+});
+
 export default router;

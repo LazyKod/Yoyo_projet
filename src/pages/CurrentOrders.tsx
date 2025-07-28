@@ -275,6 +275,16 @@ const CurrentOrders: React.FC<CurrentOrdersProps> = ({ onPageChange }) => {
                 >
                   Ajouter une commande
                 </button>
+                <button
+                  onClick={() => handleTabChange('clients-articles')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    activeTab === 'clients-articles'
+                      ? 'bg-white/20 text-white'
+                      : 'text-slate-300 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  Clients/Articles
+                </button>
               </nav>
             </div>
 

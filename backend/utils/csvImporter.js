@@ -96,34 +96,55 @@ const createDefaultClientsAndArticles = async () => {
         nom: 'ARMOR PRINT SOLUTIONS S.A.S.',
         email: 'contact@armor.com',
         telephone: '02 96 54 71 00',
-        adresse: {
+        adresse1: {
           rue: 'Zone Industrielle de Kergaradec',
           ville: 'La Chapelle-sur-Erdre',
           codePostal: '44240',
           pays: 'France'
-        }
+        },
+        adresse2: {
+          rue: 'Zone Industrielle de Kergaradec',
+          ville: 'La Chapelle-sur-Erdre',
+          codePostal: '44240',
+          pays: 'France'
+        },
+        memeAdresseLivraison: true
       },
       {
         nom: 'TECH SOLUTIONS SARL',
         email: 'info@techsolutions.fr',
         telephone: '01 23 45 67 89',
-        adresse: {
+        adresse1: {
           rue: '15 Avenue des Technologies',
           ville: 'Paris',
           codePostal: '75001',
           pays: 'France'
-        }
+        },
+        adresse2: {
+          rue: '20 Rue de la Livraison',
+          ville: 'Paris',
+          codePostal: '75002',
+          pays: 'France'
+        },
+        memeAdresseLivraison: false
       },
       {
         nom: 'IMPRIMERIE MODERNE',
         email: 'contact@imprimerie-moderne.fr',
         telephone: '04 78 90 12 34',
-        adresse: {
+        adresse1: {
           rue: '25 Rue de l\'Industrie',
           ville: 'Lyon',
           codePostal: '69000',
           pays: 'France'
-        }
+        },
+        adresse2: {
+          rue: '25 Rue de l\'Industrie',
+          ville: 'Lyon',
+          codePostal: '69000',
+          pays: 'France'
+        },
+        memeAdresseLivraison: true
       }
     ];
 
