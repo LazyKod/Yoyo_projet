@@ -208,7 +208,27 @@ const CurrentOrders: React.FC<CurrentOrdersProps> = ({ onPageChange }) => {
   };
 
   const handleGenerateOrderForm = (orderId: string) => {
-    setShowOrderForm(true);
+    // Récupérer les données complètes de la commande avant d'ouvrir le modal
+    const fetchOrderWithClient = async () => {
+      try {
+        console.log('🔄 Récupération des données complètes pour la commande:', orderId);
+        const response = await axios.get(`/api/orders/${orderId}`);
+        if (response.data.success) {
+          console.log('✅ Données complètes récupérées:', response.data.data);
+          console.log('👤 Client dans les données:', response.data.data.client);
+          setSelectedOrder(response.data.data);
+          setShowOrderForm(true);
+        } else {
+          console.error('❌ Erreur lors de la récupération:', response.data.message);
+          setMessage({ type: 'error', text: 'Erreur lors de la récupération des données de la commande' });
+        }
+      } catch (error) {
+        console.error('❌ Erreur lors de la récupération de la commande:', error);
+        setMessage({ type: 'error', text: 'Erreur lors de la récupération des données de la commande' });
+      }
+    };
+    
+    fetchOrderWithClient();
   };
 
   if (loading) {
