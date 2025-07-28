@@ -241,7 +241,7 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const { clientId, articles, dateLivraison, typeCommande, notes } = req.body;
 
     const order = await Order.findById(id);
     if (!order) {
@@ -251,24 +251,61 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    // Mettre à jour les champs autorisés
-    if (updateData.clientLivreFinal) order.clientLivreFinal = updateData.clientLivreFinal;
-    if (updateData.dateLivraison) order.dateLivraison = new Date(updateData.dateLivraison);
-    if (updateData.typeCommande) order.typeCommande = updateData.typeCommande;
+    // Récupérer les informations du client si fourni
+    if (clientId) {
+      const Client = (await import('../models/Client.js')).default;
+      const client = await Client.findById(clientId);
+      if (!client) {
+        return res.status(404).json({
+          success: false,
+          message: 'Client non trouvé'
+        });
+      }
+      order.clientLivreFinal = client.nom;
+    }
+
+    // Mettre à jour les champs
+    if (dateLivraison) order.dateLivraison = new Date(dateLivraison);
+    if (typeCommande) order.typeCommande = typeCommande;
+    if (notes !== undefined) order.notes = notes;
     
     // Mettre à jour les articles si fournis
-    if (updateData.articles && Array.isArray(updateData.articles)) {
-      order.articles = updateData.articles.map(article => ({
-        technologie: article.technologie,
-        familleProduit: article.familleProduit,
-        groupeCouverture: article.groupeCouverture || 'PF',
-        quantiteCommandee: article.quantiteCommandee,
-        quantiteALivrer: article.quantiteALivrer || article.quantiteCommandee,
-        quantiteExpediee: article.quantiteExpediee || 0,
-        quantiteEnPreparation: article.quantiteEnPreparation || 0,
-        unite: article.unite || 'PCE',
-        confirmations: article.confirmations || []
-      }));
+    if (articles && Array.isArray(articles)) {
+      const Article = (await import('../models/Article.js')).default;
+      const articlesData = [];
+      
+      for (const articleReq of articles) {
+        const article = await Article.findById(articleReq.articleId);
+        if (!article) {
+          return res.status(404).json({
+            success: false,
+            message: `Article non trouvé: ${articleReq.articleId}`
+          });
+        }
+        
+        // Vérifier le stock disponible
+        const stockDisponible = (article.stock || 0) - (article.stockReserve || 0);
+        if (articleReq.quantite > stockDisponible) {
+          return res.status(400).json({
+            success: false,
+            message: `Stock insuffisant pour ${article.numeroArticle}`
+          });
+        }
+        
+        articlesData.push({
+          technologie: article.technologie,
+          familleProduit: article.familleProduit,
+          groupeCouverture: 'PF',
+          quantiteCommandee: articleReq.quantite,
+          quantiteALivrer: articleReq.quantite,
+          quantiteExpediee: 0,
+          quantiteEnPreparation: 0,
+          unite: article.unite,
+          confirmations: []
+        });
+      }
+      
+      order.articles = articlesData;
     }
 
     const updatedOrder = await order.save();

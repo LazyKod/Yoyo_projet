@@ -18,6 +18,7 @@ import axios from 'axios';
 
 interface AddOrderProps {
   onPageChange: (page: string) => void;
+  editOrderId: string | null;
 }
 
 interface Client {
@@ -64,10 +65,11 @@ interface OrderFormData {
   notes: string;
 }
 
-const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
+const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('add-order');
   const [loading, setLoading] = useState(false);
+  const [loadingOrder, setLoadingOrder] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
   const [clients, setClients] = useState<Client[]>([]);
@@ -85,10 +87,69 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+  // Charger la commande à modifier si editOrderId est fourni
+  useEffect(() => {
+    const loadOrderForEdit = async () => {
+      if (!editOrderId) return;
+      
+      try {
+        setLoadingOrder(true);
+        const response = await axios.get(`/api/orders/${editOrderId}`);
+        
+        if (response.data.success) {
+          const order = response.data.data;
+          
+          // Remplir le formulaire avec les données de la commande
+          setFormData({
+            clientId: '', // On va chercher le client par nom
+            articles: [], // On va reconstruire les articles
+            dateLivraison: order.dateLivraison ? order.dateLivraison.split('T')[0] : '',
+            typeCommande: order.typeCommande || 'ZIG',
+            notes: order.notes || ''
+          });
+          
+          // Trouver le client correspondant
+          const matchingClient = clients.find(c => c.nom === order.clientLivreFinal);
+          if (matchingClient) {
+            setFormData(prev => ({ ...prev, clientId: matchingClient._id }));
+          }
+          
+          // Reconstruire les articles (simulation basée sur les données disponibles)
+          const reconstructedArticles: ArticleCommande[] = order.articles.map((orderArticle: any, index: number) => {
+            // Trouver l'article correspondant dans la liste des articles
+            const matchingArticle = articles.find(a => a.technologie === orderArticle.technologie);
+            
+            return {
+              articleId: matchingArticle?._id || `temp-${index}`,
+              numeroArticle: matchingArticle?.numeroArticle || orderArticle.technologie,
+              designation: matchingArticle?.designation || orderArticle.familleProduit,
+              quantite: orderArticle.quantiteCommandee || 1,
+              prixUnitaire: matchingArticle?.prixUnitaire || 50,
+              unite: orderArticle.unite || 'PCE',
+              stockDisponible: matchingArticle?.stockDisponible || 100
+            };
+          });
+          
+          setFormData(prev => ({ ...prev, articles: reconstructedArticles }));
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement de la commande:', error);
+        setMessage({ type: 'error', text: 'Erreur lors du chargement de la commande à modifier' });
+      } finally {
+        setLoadingOrder(false);
+      }
+    };
+
+    if (editOrderId && clients.length > 0 && articles.length > 0) {
+      loadOrderForEdit();
+    }
+  }, [editOrderId, clients, articles]);
+
   // Charger les clients et articles
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true);
         const [clientsResponse, articlesResponse] = await Promise.all([
           axios.get('/api/clients'),
           axios.get('/api/articles')
@@ -96,13 +157,20 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
 
         if (clientsResponse.data.success) {
           setClients(clientsResponse.data.data);
+        } else {
+          setMessage({ type: 'error', text: 'Erreur lors du chargement des clients' });
         }
 
         if (articlesResponse.data.success) {
           setArticles(articlesResponse.data.data);
+        } else {
+          setMessage({ type: 'error', text: 'Erreur lors du chargement des articles' });
         }
       } catch (error) {
         console.error('Erreur lors du chargement des données:', error);
+        setMessage({ type: 'error', text: 'Erreur lors du chargement des données. Vérifiez que le serveur est démarré.' });
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -243,32 +311,47 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
 
       console.log('Données envoyées:', orderData); // Debug
 
-      const response = await axios.post('/api/orders', orderData);
+      let response;
+      if (editOrderId) {
+        // Mode modification
+        response = await axios.put(`/api/orders/${editOrderId}`, orderData);
+      } else {
+        // Mode création
+        response = await axios.post('/api/orders', orderData);
+      }
 
       if (response.data.success) {
-        setMessage({ type: 'success', text: 'Commande créée avec succès !' });
+        setMessage({ 
+          type: 'success', 
+          text: editOrderId ? 'Commande modifiée avec succès !' : 'Commande créée avec succès !' 
+        });
         
         // Reset du formulaire après succès
-        setFormData({
-          clientId: '',
-          articles: [],
-          dateLivraison: '',
-          typeCommande: 'ZIG',
-          notes: ''
-        });
+        if (!editOrderId) {
+          setFormData({
+            clientId: '',
+            articles: [],
+            dateLivraison: '',
+            typeCommande: 'ZIG',
+            notes: ''
+          });
+        }
 
         // Redirection vers la gestion des commandes après 2 secondes
         setTimeout(() => {
           onPageChange('current-orders');
         }, 2000);
       } else {
-        setMessage({ type: 'error', text: response.data.message || 'Erreur lors de la création de la commande' });
+        setMessage({ 
+          type: 'error', 
+          text: response.data.message || `Erreur lors de ${editOrderId ? 'la modification' : 'la création'} de la commande` 
+        });
       }
     } catch (error: any) {
-      console.error('Erreur lors de la création de la commande:', error);
+      console.error(`Erreur lors de ${editOrderId ? 'la modification' : 'la création'} de la commande:`, error);
       setMessage({ 
         type: 'error', 
-        text: error.response?.data?.message || 'Erreur lors de la création de la commande'
+        text: error.response?.data?.message || `Erreur lors de ${editOrderId ? 'la modification' : 'la création'} de la commande`
       });
     } finally {
       setLoading(false);
@@ -286,6 +369,18 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
   );
 
   const { montantHT, montantTVA, montantTTC } = calculateTotals();
+
+  // Afficher un loader pendant le chargement initial
+  if (loading && clients.length === 0 && articles.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Chargement des données...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
@@ -376,11 +471,23 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
               Retour
             </button>
             <div>
-              <h1 className="text-3xl font-bold text-slate-800 mb-2">Ajouter une commande</h1>
-              <p className="text-slate-600">Créez une nouvelle commande multi-articles</p>
+              <h1 className="text-3xl font-bold text-slate-800 mb-2">
+                {editOrderId ? 'Modifier la commande' : 'Ajouter une commande'}
+              </h1>
+              <p className="text-slate-600">
+                {editOrderId ? 'Modifiez les détails de la commande' : 'Créez une nouvelle commande multi-articles'}
+              </p>
             </div>
           </div>
         </div>
+
+        {/* Loader pour le chargement de la commande à modifier */}
+        {loadingOrder && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+            <span className="text-blue-700">Chargement de la commande à modifier...</span>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Formulaire principal */}
@@ -596,7 +703,10 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange }) => {
                     ) : (
                       <Save className="w-5 h-5 mr-2" />
                     )}
-                    {loading ? 'Création en cours...' : 'Créer la commande'}
+                    {loading ? 
+                      (editOrderId ? 'Modification en cours...' : 'Création en cours...') : 
+                      (editOrderId ? 'Modifier la commande' : 'Créer la commande')
+                    }
                   </button>
                 </div>
               </form>

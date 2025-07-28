@@ -25,6 +25,15 @@ router.get('/', async (req, res) => {
     // Ajouter le stock disponible
     const articlesWithStock = articles.map(article => ({
       ...article,
+      _id: article._id || '',
+      numeroArticle: article.numeroArticle || 'N/A',
+      designation: article.designation || 'N/A',
+      technologie: article.technologie || 'N/A',
+      familleProduit: article.familleProduit || 'N/A',
+      prixUnitaire: article.prixUnitaire || 0,
+      unite: article.unite || 'PCE',
+      stock: article.stock || 0,
+      stockReserve: article.stockReserve || 0,
       stockDisponible: article.stock - article.stockReserve
     }));
 

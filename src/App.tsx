@@ -28,13 +28,19 @@ function AppContent() {
 
   // Passer la fonction de changement de page aux composants
   const renderCurrentPage = () => {
+    // Gérer les pages de modification de commande
+    if (currentPage.startsWith('edit-order-')) {
+      const orderId = currentPage.replace('edit-order-', '');
+      return <AddOrder onPageChange={handlePageChange} editOrderId={orderId} />;
+    }
+    
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard onPageChange={handlePageChange} />;
       case 'current-orders':
         return <CurrentOrders onPageChange={handlePageChange} />;
       case 'add-order':
-        return <AddOrder onPageChange={handlePageChange} />;
+        return <AddOrder onPageChange={handlePageChange} editOrderId={null} />;
       default:
         return <Dashboard onPageChange={handlePageChange} />;
     }

@@ -21,9 +21,19 @@ router.get('/', async (req, res) => {
       .sort({ nom: 1 })
       .lean();
 
+    // Vérifier les champs requis
+    const safeClients = clients.map(client => ({
+      ...client,
+      _id: client._id || '',
+      nom: client.nom || 'Client inconnu',
+      email: client.email || 'email@inconnu.com',
+      telephone: client.telephone || '',
+      adresse: client.adresse || {}
+    }));
+
     res.json({
       success: true,
-      data: clients
+      data: safeClients
     });
 
   } catch (error) {

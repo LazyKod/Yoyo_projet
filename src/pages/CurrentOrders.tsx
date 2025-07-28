@@ -203,7 +203,8 @@ const CurrentOrders: React.FC<CurrentOrdersProps> = ({ onPageChange }) => {
   };
 
   const handleModifyOrder = (orderId: string) => {
-    setMessage({ type: 'error', text: 'Fonctionnalité de modification en cours de développement' });
+    // Rediriger vers la page d'ajout avec l'ID de la commande à modifier
+    onPageChange(`edit-order-${orderId}`);
   };
 
   const handleGenerateOrderForm = (orderId: string) => {
