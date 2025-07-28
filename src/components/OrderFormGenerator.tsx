@@ -13,6 +13,25 @@ interface Order {
   dateCreation: string;
   dateLivraison: string;
   typeCommande: string;
+  client?: {
+    nom: string;
+    entreprise: string;
+    email: string;
+    telephone: string;
+    adresse1: {
+      rue: string;
+      ville: string;
+      codePostal: string;
+      pays: string;
+    };
+    adresse2: {
+      rue: string;
+      ville: string;
+      codePostal: string;
+      pays: string;
+    };
+    memeAdresseLivraison: boolean;
+  };
 }
 
 interface OrderFormGeneratorProps {
@@ -116,21 +135,21 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
             <div>
               <h3 className="font-bold mb-2">À :</h3>
               <div className="text-sm">
-                <p>Nom : {order.clientLivreFinal}</p>
-                <p>Entreprise : {order.clientLivreFinal}</p>
-                <p>Adresse :</p>
-                <p>Ville, État/Province, Code Postal :</p>
-                <p>Téléphone :</p>
+                <p>Nom : {order.client?.nom || order.clientLivreFinal}</p>
+                <p>Entreprise : {order.client?.entreprise || order.clientLivreFinal}</p>
+                <p>Adresse : {order.client?.adresse1?.rue || ''}</p>
+                <p>Ville, État/Province, Code Postal : {order.client?.adresse1?.ville || ''}, {order.client?.adresse1?.codePostal || ''}</p>
+                <p>Téléphone : {order.client?.telephone || ''}</p>
               </div>
             </div>
             <div>
               <h3 className="font-bold mb-2">Adresse de livraison :</h3>
               <div className="text-sm">
-                <p>Nom : {order.clientLivreFinal}</p>
-                <p>Entreprise : {order.clientLivreFinal}</p>
-                <p>Adresse :</p>
-                <p>Ville, État Cod Postal :</p>
-                <p>Téléphone :</p>
+                <p>Nom : {order.client?.nom || order.clientLivreFinal}</p>
+                <p>Entreprise : {order.client?.entreprise || order.clientLivreFinal}</p>
+                <p>Adresse : {order.client?.memeAdresseLivraison ? order.client?.adresse1?.rue : order.client?.adresse2?.rue || ''}</p>
+                <p>Ville, État Cod Postal : {order.client?.memeAdresseLivraison ? order.client?.adresse1?.ville : order.client?.adresse2?.ville || ''}, {order.client?.memeAdresseLivraison ? order.client?.adresse1?.codePostal : order.client?.adresse2?.codePostal || ''}</p>
+                <p>Téléphone : {order.client?.telephone || ''}</p>
               </div>
             </div>
           </div>
