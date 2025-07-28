@@ -44,18 +44,23 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
     return new Date(dateString).toLocaleDateString('fr-FR');
   };
 
-  // Debug: afficher les données du client avec plus de détails
-  console.log('🎯 OrderFormGenerator - Données complètes reçues:');
-  console.log('📋 Order:', order);
-  console.log('👤 Client:', order.client);
+  // Debug détaillé pour identifier le problème
+  console.log('🎯 OrderFormGenerator - DEBUT DEBUG');
+  console.log('📋 Order complet:', JSON.stringify(order, null, 2));
+  console.log('👤 Client existe?', !!order.client);
   
   if (order.client) {
-    console.log('🏠 Adresse1:', order.client.adresse1);
-    console.log('🚚 Adresse2:', order.client.adresse2);
-    console.log('📍 Même adresse livraison:', order.client.memeAdresseLivraison);
+    console.log('👤 Client data:', JSON.stringify(order.client, null, 2));
+    console.log('🏠 Adresse1 existe?', !!order.client.adresse1);
+    console.log('🏠 Adresse1 rue:', order.client.adresse1?.rue);
+    console.log('🏠 Adresse1 ville:', order.client.adresse1?.ville);
+    console.log('🚚 Adresse2 existe?', !!order.client.adresse2);
+    console.log('🚚 Adresse2 rue:', order.client.adresse2?.rue);
+    console.log('📍 Même adresse?', order.client.memeAdresseLivraison);
   } else {
-    console.log('❌ Aucune donnée client trouvée');
+    console.log('❌ PAS DE CLIENT DANS ORDER');
   }
+  console.log('🎯 OrderFormGenerator - FIN DEBUG');
   
   const calculateTotals = () => {
     // Prix estimé par article (à remplacer par les vrais prix depuis la base Articles)
@@ -150,9 +155,20 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
               <div className="text-sm">
                 <p>Nom : {order.client?.nom || order.clientLivreFinal}</p>
                 <p>Entreprise : {order.client?.entreprise || order.clientLivreFinal}</p>
-                <p>Adresse : {order.client?.adresse1?.rue || 'Adresse non renseignée'}</p>
-                <p>Ville, État/Province, Code Postal : {order.client?.adresse1?.ville || ''} {order.client?.adresse1?.codePostal || ''}</p>
-                <p>Téléphone : {order.client?.telephone || ''}</p>
+                <p>Adresse : {(() => {
+                  console.log('🔍 Tentative affichage adresse1 rue:', order.client?.adresse1?.rue);
+                  return order.client?.adresse1?.rue || 'Adresse non renseignée';
+                })()}</p>
+                <p>Ville, État/Province, Code Postal : {(() => {
+                  const ville = order.client?.adresse1?.ville || '';
+                  const codePostal = order.client?.adresse1?.codePostal || '';
+                  console.log('🔍 Ville:', ville, 'Code postal:', codePostal);
+                  return `${ville} ${codePostal}`.trim();
+                })()}</p>
+                <p>Téléphone : {(() => {
+                  console.log('🔍 Téléphone:', order.client?.telephone);
+                  return order.client?.telephone || '';
+                })()}</p>
               </div>
             </div>
             <div>
@@ -160,12 +176,20 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
               <div className="text-sm">
                 <p>Nom : {order.client?.nom || order.clientLivreFinal}</p>
                 <p>Entreprise : {order.client?.entreprise || order.clientLivreFinal}</p>
-                <p>Adresse : {order.client?.memeAdresseLivraison ? 
-                  (order.client?.adresse1?.rue || 'Adresse non renseignée') : 
-                  (order.client?.adresse2?.rue || 'Adresse non renseignée')}</p>
-                <p>Ville, État Cod Postal : {order.client?.memeAdresseLivraison ? 
-                  `${order.client?.adresse1?.ville || ''} ${order.client?.adresse1?.codePostal || ''}` : 
-                  `${order.client?.adresse2?.ville || ''} ${order.client?.adresse2?.codePostal || ''}`}</p>
+                <p>Adresse : {(() => {
+                  const useSameAddress = order.client?.memeAdresseLivraison;
+                  const adresse = useSameAddress ? order.client?.adresse1?.rue : order.client?.adresse2?.rue;
+                  console.log('🔍 Même adresse livraison?', useSameAddress);
+                  console.log('🔍 Adresse livraison:', adresse);
+                  return adresse || 'Adresse non renseignée';
+                })()}</p>
+                <p>Ville, État Cod Postal : {(() => {
+                  const useSameAddress = order.client?.memeAdresseLivraison;
+                  const ville = useSameAddress ? order.client?.adresse1?.ville : order.client?.adresse2?.ville;
+                  const codePostal = useSameAddress ? order.client?.adresse1?.codePostal : order.client?.adresse2?.codePostal;
+                  console.log('🔍 Ville livraison:', ville, 'Code postal livraison:', codePostal);
+                  return `${ville || ''} ${codePostal || ''}`.trim();
+                })()}</p>
                 <p>Téléphone : {order.client?.telephone || ''}</p>
               </div>
             </div>

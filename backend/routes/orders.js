@@ -287,8 +287,14 @@ router.get('/:id', async (req, res) => {
     }
     
     if (client) {
-      console.log('📍 Adresse1 du client:', JSON.stringify(client.adresse1, null, 2));
-      console.log('📍 Adresse2 du client:', JSON.stringify(client.adresse2, null, 2));
+      console.log('📍 CLIENT TROUVÉ - Données complètes:', JSON.stringify({
+        nom: client.nom,
+        entreprise: client.entreprise,
+        telephone: client.telephone,
+        adresse1: client.adresse1,
+        adresse2: client.adresse2,
+        memeAdresseLivraison: client.memeAdresseLivraison
+      }, null, 2));
     }
     
     let orderWithClient = order.toObject();
@@ -313,6 +319,8 @@ router.get('/:id', async (req, res) => {
         },
         memeAdresseLivraison: client.memeAdresseLivraison !== false
       };
+      
+      console.log('📍 DONNÉES CLIENT PRÉPARÉES POUR ENVOI:', JSON.stringify(orderWithClient.client, null, 2));
     } else {
       console.log('❌ Client non trouvé, utilisation des données par défaut');
       orderWithClient.client = {
