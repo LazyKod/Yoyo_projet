@@ -240,18 +240,23 @@ router.get('/:id', async (req, res) => {
 
     // Récupérer les informations du client
     const Client = (await import('../models/Client.js')).default;
-    const client = await Client.findOne({ nom: order.clientLivreFinal });
+    const client = await Client.findOne({ 
+      $or: [
+        { nom: order.clientLivreFinal },
+        { entreprise: order.clientLivreFinal }
+      ]
+    });
     
     let orderWithClient = order.toObject();
     if (client) {
       orderWithClient.client = {
         nom: client.nom,
-        entreprise: client.entreprise,
+        entreprise: client.entreprise || '',
         email: client.email,
-        telephone: client.telephone,
-        adresse1: client.adresse1,
-        adresse2: client.adresse2,
-        memeAdresseLivraison: client.memeAdresseLivraison
+        telephone: client.telephone || '',
+        adresse1: client.adresse1 || { rue: '', ville: '', codePostal: '', pays: 'France' },
+        adresse2: client.adresse2 || { rue: '', ville: '', codePostal: '', pays: 'France' },
+        memeAdresseLivraison: client.memeAdresseLivraison !== false
       };
     }
     res.json({
@@ -259,6 +264,7 @@ router.get('/:id', async (req, res) => {
       data: orderWithClient
     });
   } catch (error) {
+    console.error('Erreur lors de la récupération de la commande:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la récupération de la commande'

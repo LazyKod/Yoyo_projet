@@ -358,6 +358,8 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
         response = await axios.post('/api/orders', orderData);
       }
 
+      console.log('Réponse du serveur:', response.data);
+
       if (response.data.success) {
         const createdOrderData = response.data.data;
         setCreatedOrder(createdOrderData);

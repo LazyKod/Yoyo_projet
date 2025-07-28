@@ -137,8 +137,8 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
               <div className="text-sm">
                 <p>Nom : {order.client?.nom || order.clientLivreFinal}</p>
                 <p>Entreprise : {order.client?.entreprise || order.clientLivreFinal}</p>
-                <p>Adresse : {order.client?.adresse1?.rue || ''}</p>
-                <p>Ville, État/Province, Code Postal : {order.client?.adresse1?.ville || ''}, {order.client?.adresse1?.codePostal || ''}</p>
+                <p>Adresse : {order.client?.adresse1?.rue || 'Adresse non renseignée'}</p>
+                <p>Ville, État/Province, Code Postal : {order.client?.adresse1?.ville || ''} {order.client?.adresse1?.codePostal || ''}</p>
                 <p>Téléphone : {order.client?.telephone || ''}</p>
               </div>
             </div>
@@ -147,8 +147,12 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
               <div className="text-sm">
                 <p>Nom : {order.client?.nom || order.clientLivreFinal}</p>
                 <p>Entreprise : {order.client?.entreprise || order.clientLivreFinal}</p>
-                <p>Adresse : {order.client?.memeAdresseLivraison ? order.client?.adresse1?.rue : order.client?.adresse2?.rue || ''}</p>
-                <p>Ville, État Cod Postal : {order.client?.memeAdresseLivraison ? order.client?.adresse1?.ville : order.client?.adresse2?.ville || ''}, {order.client?.memeAdresseLivraison ? order.client?.adresse1?.codePostal : order.client?.adresse2?.codePostal || ''}</p>
+                <p>Adresse : {order.client?.memeAdresseLivraison ? 
+                  (order.client?.adresse1?.rue || 'Adresse non renseignée') : 
+                  (order.client?.adresse2?.rue || 'Adresse non renseignée')}</p>
+                <p>Ville, État Cod Postal : {order.client?.memeAdresseLivraison ? 
+                  `${order.client?.adresse1?.ville || ''} ${order.client?.adresse1?.codePostal || ''}` : 
+                  `${order.client?.adresse2?.ville || ''} ${order.client?.adresse2?.codePostal || ''}`}</p>
                 <p>Téléphone : {order.client?.telephone || ''}</p>
               </div>
             </div>
