@@ -650,7 +650,7 @@ const AddOrder: React.FC<AddOrderProps> = ({ onPageChange, editOrderId }) => {
                       <option value="">Sélectionnez un client</option>
                       {clients.map(client => (
                         <option key={client._id} value={client._id}>
-                          {client.nom} - {client.email}
+                          {client.nom}
                         </option>
                       ))}
                     </select>
