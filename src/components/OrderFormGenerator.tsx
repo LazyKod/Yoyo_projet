@@ -273,7 +273,7 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
               ))}
               {/* Totaux */}
               <tr>
-                <td colSpan={4} className="border border-slate-300 px-3 py-2 text-sm text-right font-bold">SOUSTOTAL</td>
+                <td colSpan={4} className="border border-slate-300 px-3 py-2 text-sm text-right font-bold">MONTANT HT</td>
                 <td className="border border-slate-300 px-3 py-2 text-sm text-right">{sousTotal.toFixed(2)} €</td>
               </tr>
               <tr>
