@@ -158,11 +158,11 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
           <div className="mb-6">
             <h2 className="text-lg font-bold mb-2">ARMOR PRINT SOLUTIONS</h2>
             <div className="text-sm text-slate-600">
-              <p>7, Rue Balouch El Hassan :</p>
-              <p>Casablanca :</p>
-              <p>20100 :</p>
-              <p>05 22 25 68 31 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [Fax] :</p>
-              <p>contact@armor.com :</p>
+              <p>7, Rue Balouch El Hassan</p>
+              <p>Casablanca</p>
+              <p>20100</p>
+              <p>05 22 25 68 31</p>
+              <p>contact@armor.com</p>
             </div>
           </div>
 
@@ -281,7 +281,7 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
                 <td className="border border-slate-300 px-3 py-2 text-sm text-right">{taxe.toFixed(2)} €</td>
               </tr>
               <tr>
-                <td colSpan={4} className="border border-slate-300 px-3 py-2 text-sm text-right font-bold">TRANSP. &MANUTENTION</td>
+                <td colSpan={4} className="border border-slate-300 px-3 py-2 text-sm text-right font-bold">TRANSP. & MANUTENTION</td>
                 <td className="border border-slate-300 px-3 py-2 text-sm text-right">{transport.toFixed(2)} €</td>
               </tr>
               <tr>
