@@ -79,7 +79,34 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
   const { sousTotal, taxe, transport, total } = calculateTotals();
 
   const handlePrint = () => {
+    // Masquer tous les éléments sauf le bon de commande
+    const elementsToHide = document.querySelectorAll('body > *:not(.order-form-print)');
+    const originalDisplay: string[] = [];
+    
+    // Sauvegarder les styles originaux et masquer les éléments
+    elementsToHide.forEach((element, index) => {
+      const htmlElement = element as HTMLElement;
+      originalDisplay[index] = htmlElement.style.display;
+      htmlElement.style.display = 'none';
+    });
+    
+    // Créer un conteneur temporaire pour l'impression
+    const printContainer = document.createElement('div');
+    printContainer.className = 'order-form-print';
+    printContainer.innerHTML = document.querySelector('.order-form-content')?.innerHTML || '';
+    document.body.appendChild(printContainer);
+    
+    // Lancer l'impression
     window.print();
+    
+    // Restaurer l'affichage original après impression
+    setTimeout(() => {
+      elementsToHide.forEach((element, index) => {
+        const htmlElement = element as HTMLElement;
+        htmlElement.style.display = originalDisplay[index];
+      });
+      document.body.removeChild(printContainer);
+    }, 100);
   };
 
   return (
@@ -105,7 +132,7 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
         </div>
 
         {/* Contenu du bon de commande */}
-        <div className="p-8 bg-white" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <div className="order-form-content p-8 bg-white" style={{ fontFamily: 'Arial, sans-serif' }}>
           {/* En-tête avec logo */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center">
@@ -289,15 +316,19 @@ const OrderFormGenerator: React.FC<OrderFormGeneratorProps> = ({ order, onClose 
           .no-print {
             display: none !important;
           }
-          .fixed {
-            position: static !important;
-          }
-          .bg-black {
-            background: transparent !important;
-          }
           body {
             margin: 0;
             padding: 0;
+          }
+          body > *:not(.order-form-print) {
+            display: none !important;
+          }
+          .order-form-print {
+            display: block !important;
+            position: static !important;
+            background: white !important;
+            padding: 20px !important;
+            font-family: Arial, sans-serif !important;
           }
           * {
             -webkit-print-color-adjust: exact !important;
